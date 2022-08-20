@@ -16,7 +16,7 @@ namespace NN01
                 labels[i] = new float[classCount];
                 for (int j = 0; j < classCount; j++)
                 {
-                    labels[i][j] = (classes[i] == (j + 1)) ? 1f : 0f;
+                    labels[i][j] = classes[i] == j + 1 ? 1f : 0f;
                 }
             }
             return labels;
@@ -164,7 +164,7 @@ namespace NN01
                 // test if training is ready before completing all steps 
                 (cost, fitness) =>
                 {
-                    return fitness > readyAt && (1 - cost > readyAt);
+                    return fitness > readyAt && 1 - cost > readyAt;
                 },
 
                 steps,

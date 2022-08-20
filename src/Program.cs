@@ -1,30 +1,7 @@
 ﻿using NN01;
 using System.Diagnostics;
-using System.Linq.Expressions;
 
 
-void Test(NeuralNetwork network, string msg, float[] data, float label)
-{
-    bool IsSet(float value) => value > 0.6f;
-
-    ConsoleColor prev = Console.ForegroundColor;
-    float output = network.FeedForward(data)[0];
-    if (IsSet(label) == IsSet(output))
-    {
-        Console.Write($"Test {msg} == {label} => ");
-        Console.ForegroundColor = ConsoleColor.Green;
-
-        if (!IsSet(label)) output = 1f - Math.Abs(output); 
-
-        Console.WriteLine($"OK {Math.Min(100f, Math.Abs(output) * 100f).ToString("0")}%"); 
-    }
-    else
-    {
-        Console.ForegroundColor = ConsoleColor.Red; 
-        Console.WriteLine($"Test {msg} == {label} => FAIL {(output * 100f).ToString("0")}%");
-    }
-    Console.ForegroundColor = prev;
-}
 
 
 const int populationCount = 100;
@@ -144,3 +121,29 @@ do
     Console.WriteLine("[SPACEBAR] to run tests again, any other to exit");
 }
 while (Console.ReadKey().Key == ConsoleKey.Spacebar);
+
+
+
+// show results for a single test 
+void Test(NeuralNetwork network, string msg, float[] data, float label)
+{
+    bool IsSet(float value) => value > 0.6f;
+
+    ConsoleColor prev = Console.ForegroundColor;
+    float output = network.FeedForward(data)[0];
+    if (IsSet(label) == IsSet(output))
+    {
+        Console.Write($"Test {msg} == {label} => ");
+        Console.ForegroundColor = ConsoleColor.Green;
+
+        if (!IsSet(label)) output = 1f - Math.Abs(output);
+
+        Console.WriteLine($"OK {Math.Min(100f, Math.Abs(output) * 100f).ToString("0")}%");
+    }
+    else
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"Test {msg} == {label} => FAIL {(output * 100f).ToString("0")}%");
+    }
+    Console.ForegroundColor = prev;
+}
