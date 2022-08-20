@@ -14,9 +14,9 @@ void Test(NeuralNetwork network, string msg, float[] data, float label)
         Console.Write($"Test {msg} == {label} => ");
         Console.ForegroundColor = ConsoleColor.Green;
 
-        if (!IsSet(label)) output = output + 1f; 
+        if (!IsSet(label)) output = 1f - Math.Abs(output); 
 
-        Console.WriteLine($"OK {(output * 100f).ToString("0")}%"); 
+        Console.WriteLine($"OK {Math.Min(100f, Math.Abs(output) * 100f).ToString("0")}%"); 
     }
     else
     {
@@ -116,7 +116,7 @@ do
             testClasses,
             (cost, fitness) =>
             {
-                return fitness > 0.999f && (cost < 0.01f);
+                return fitness > 0.999f && (cost < 0.005f);
             },
             steps, 
             populationCount
