@@ -64,7 +64,7 @@ namespace NN01
                 // estimate fitness 
                 for (int j = 0; j < population; j++)
                 {
-                    networks[j].fitness =
+                    networks[j].Fitness =
                         fitnessEstimator(networks[j], patterns, labels)
                         *
                         fitnessEstimator(networks[j], testPatterns, testLabels);
@@ -73,7 +73,7 @@ namespace NN01
                 // sort on fitness and stop early past perfect fit 
                 networks.Sort();
 
-                if (readyTest(networks[population - 1].cost, networks[population - 1].fitness))
+                if (readyTest(networks[population - 1].Cost, networks[population - 1].Fitness))
                 {
                     break;
                 }

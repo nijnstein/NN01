@@ -129,8 +129,8 @@ do
     Console.WriteLine($">          Time: {sw.Elapsed.TotalMilliseconds.ToString("0.000")}ms");
     Console.WriteLine($">      Steptime: {(sw.Elapsed.TotalMilliseconds / (stepsTrained * populationCount)).ToString("0.000")}ms");
     Console.WriteLine($"> Steps trained: {stepsTrained}");
-    Console.WriteLine($">          Cost: {nn.cost.ToString("0.0000000")}");
-    Console.WriteLine($">       Fitness: {nn.fitness.ToString("0.0000000")}");
+    Console.WriteLine($">          Cost: {nn.Cost.ToString("0.0000000")}");
+    Console.WriteLine($">       Fitness: {nn.Fitness.ToString("0.0000000")}");
     Console.WriteLine("");
     Console.WriteLine("");
 

@@ -8,20 +8,30 @@ namespace NN01
 {
     public enum LayerActivationFunction
     {
-        Sigmoid, Tanh, 
+        Sigmoid, 
+
+        Tanh, 
+        
         /// <summary>
         /// Rectified Linear Unit 
         /// </summary>
         ReLU,
+
         /// <summary>
         /// Leaky Rectified Linear Unit
         /// </summary>
         LeakyReLU, 
 
         SoftMax,
+
+        /// <summary>
+        /// reduces to linear regression
+        /// </summary>
         Linear, 
-        
-        
+      
+        /// <summary>
+        /// swish by google 
+        /// </summary>
         Swish,
         
         /// <summary>
@@ -29,22 +39,14 @@ namespace NN01
         /// </summary>
         Binary,
 
-        
         None
-    }
-
-    public enum LayerType
-    {
-        Input, Hidden, Output
     }
 
     public abstract class Layer
     {
-        public float[] neurons;
-        public float[][] weights;
-        public float[] biases;
-
-        public LayerType LayerType { get; set; }
+        public float[] Neurons;
+        public float[][] Weights;
+        public float[] Biases;
 
         public int Size;
         public int PreviousSize;
@@ -57,26 +59,26 @@ namespace NN01
         {
             Size = size;
             PreviousSize = previousSize;
-            neurons = new float[size];
+            Neurons = new float[size];
 
             if (!IsInput)
             {
-                biases = new float[size];
-                weights = (IsInput ? null : new float[size][])!;
+                Biases = new float[size];
+                Weights = (IsInput ? null : new float[size][])!;
                 for (int i = 0; i < size; i++)
                 {
-                    biases[i] = Random.Shared.NextSingle() - 0.5f;
-                    weights![i] = new float[previousSize];
+                    Biases[i] = Random.Shared.NextSingle() - 0.5f;
+                    Weights![i] = new float[previousSize];
                     for (int j = 0; j < previousSize; j++)
                     {
-                        weights[i][j] = Random.Shared.NextSingle() - 0.5f;
+                        Weights[i][j] = Random.Shared.NextSingle() - 0.5f;
                     }
                 }
             }
             else
             {
-                biases = null!;
-                weights = null!;
+                Biases = null!;
+                Weights = null!;
             }
         }
 
@@ -85,12 +87,12 @@ namespace NN01
 
         public void CalculateGamma(float[] gamma)
         {
-            CalculateGamma(gamma, gamma, neurons);
+            CalculateGamma(gamma, gamma, Neurons);
         }
     }
 
     public class BinaryLayer : Layer
-    {
+    {       
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Binary;
         public BinaryLayer(int size, int previousSize) : base(size, previousSize) { }
         public override void Activate(Layer previous)
@@ -100,10 +102,10 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += weights[j][k] * previous.neurons[k];
+                    value += Weights[j][k] * previous.Neurons[k];
                 }
 
-                neurons[j] = value < 0 ? 0 : 1;
+                Neurons[j] = value < 0 ? 0 : 1;
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
@@ -129,11 +131,11 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += weights[j][k] * previous.neurons[k];
+                    value += Weights[j][k] * previous.Neurons[k];
                 }
 
                 // relu 
-                neurons[j] = Math.Max(value, 0);
+                Neurons[j] = Math.Max(value, 0);
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
@@ -158,11 +160,11 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += weights[j][k] * previous.neurons[k];
+                    value += Weights[j][k] * previous.Neurons[k];
                 }
 
                 // relu 
-                neurons[j] = value < 0 ? (float)Math.Exp(value) - 1 : value;
+                Neurons[j] = value < 0 ? (float)Math.Exp(value) - 1 : value;
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
@@ -187,9 +189,9 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += weights[j][k] * previous.neurons[k];
+                    value += Weights[j][k] * previous.Neurons[k];
                 }
-                neurons[j] = (float)Math.Tanh(value);
+                Neurons[j] = (float)Math.Tanh(value);
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
@@ -213,12 +215,12 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += weights[j][k] * previous.neurons[k];
+                    value += Weights[j][k] * previous.Neurons[k];
                 }
 
                 // sigmoid activation  
                 float f = (float)Math.Exp(value);
-                neurons[j] = f / (1.0f + f);
+                Neurons[j] = f / (1.0f + f);
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
@@ -245,9 +247,9 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += weights[j][k] * previous.neurons[k];
+                    value += Weights[j][k] * previous.Neurons[k];
                 }
-                neurons[j] = value.Swish();
+                Neurons[j] = value.Swish();
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
@@ -273,10 +275,10 @@ namespace NN01
 
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    values[k] = weights[j][k] * previous.neurons[k];
+                    values[k] = Weights[j][k] * previous.Neurons[k];
                 }
 
-                MathExtensions.Softmax(values, neurons);
+                MathExtensions.Softmax(values, Neurons);
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
@@ -299,7 +301,7 @@ namespace NN01
             {
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    neurons[k] = weights[j][k] * previous.neurons[k];
+                    Neurons[k] = Weights[j][k] * previous.Neurons[k];
                 }
             }
         }
