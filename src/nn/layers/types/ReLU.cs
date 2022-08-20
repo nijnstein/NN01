@@ -9,7 +9,18 @@ namespace NN01
     public class ReLuLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.ReLU;
-        public ReLuLayer(int size, int previousSize) : base(size, previousSize, LayerInitializer.HeNormal, LayerInitializer.Random) { }
+        public ReLuLayer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Default, LayerInitializer biasInit = LayerInitializer.Default, bool skipInit = false)
+            : base
+            (
+                  size, 
+                  previousSize, 
+                  weightInit == LayerInitializer.Default ? LayerInitializer.HeNormal : weightInit,
+                  biasInit == LayerInitializer.Default ? LayerInitializer.Random : biasInit,
+                  skipInit
+            ) 
+        { 
+        }
+
         public override void Activate(Layer previous)
         {
             for (int j = 0; j < Size; j++)

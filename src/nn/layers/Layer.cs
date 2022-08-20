@@ -22,7 +22,7 @@ namespace NN01
         public LayerInitializer WeightInitializer { get; set; } = LayerInitializer.Random;
         public LayerInitializer BiasInitializer { get; set; } = LayerInitializer.Random;
 
-        public Layer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Random, LayerInitializer biasInit = LayerInitializer.Random)
+        public Layer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Random, LayerInitializer biasInit = LayerInitializer.Random, bool skipInit = true)
         {
             Size = size;
             PreviousSize = previousSize;
@@ -34,13 +34,19 @@ namespace NN01
             if (!IsInput)
             {
                 Biases = new float[size];
-                InitializeDistribution(BiasInitializer, Biases);
+                if (!skipInit)
+                {
+                    InitializeDistribution(BiasInitializer, Biases);
+                }
 
                 Weights = (IsInput ? null : new float[size][])!;
                 for (int i = 0; i < size; i++)
                 {
                     Weights![i] = new float[previousSize];
-                    InitializeDistribution(WeightInitializer, Weights[i]);
+                    if (!skipInit)
+                    {
+                        InitializeDistribution(WeightInitializer, Weights[i]);
+                    }
                 }
             }
             else

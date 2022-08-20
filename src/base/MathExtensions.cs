@@ -156,5 +156,9 @@ namespace NN01
             }
         }
 
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Range(this Random random, float low, float high) => random.NextSingle() * (high - low) + low;
+
     }
 }

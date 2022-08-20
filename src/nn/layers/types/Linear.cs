@@ -4,12 +4,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NN01 
+namespace NN01
 {
     public class LinearLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Linear;
-        public LinearLayer(int size, int previousSize) : base(size, previousSize, LayerInitializer.Ones, LayerInitializer.Zeros) { }
+        public LinearLayer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Default, LayerInitializer biasInit = LayerInitializer.Default, bool skipInit = false)
+            : base
+            (
+                  size,
+                  previousSize,
+                  weightInit == LayerInitializer.Default ? LayerInitializer.Ones : weightInit,
+                  biasInit == LayerInitializer.Default ? LayerInitializer.Zeros : biasInit,
+                  skipInit
+            )
+        {
+        }
         public override void Activate(Layer previous)
         {
             for (int j = 0; j < Size; j++)

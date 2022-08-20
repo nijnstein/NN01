@@ -4,8 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NN01 
-{           
+namespace NN01
+{
     public class InputLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.None;

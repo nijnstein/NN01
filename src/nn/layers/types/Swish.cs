@@ -9,7 +9,17 @@ namespace NN01
     public class SwishLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Swish;
-        public SwishLayer(int size, int previousSize) : base(size, previousSize, LayerInitializer.Normal, LayerInitializer.Random) { }
+        public SwishLayer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Default, LayerInitializer biasInit = LayerInitializer.Default, bool skipInit = false)
+            : base
+            (
+                  size,
+                  previousSize,
+                  weightInit == LayerInitializer.Default ? LayerInitializer.HeNormal : weightInit,
+                  biasInit == LayerInitializer.Default ? LayerInitializer.Random : biasInit,
+                  skipInit
+            )
+        {
+        }
 
         public override void Activate(Layer previous)
         {

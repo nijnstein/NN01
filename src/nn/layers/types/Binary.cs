@@ -4,12 +4,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NN01  
+namespace NN01
 {
     public class BinaryLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Binary;
-        public BinaryLayer(int size, int previousSize) : base(size, previousSize, LayerInitializer.Normal, LayerInitializer.Random) { }
+        public BinaryLayer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Default, LayerInitializer biasInit = LayerInitializer.Default, bool skipInit = false)
+            : base
+            (
+                  size,
+                  previousSize,
+                  weightInit == LayerInitializer.Default ? LayerInitializer.Normal : weightInit,
+                  biasInit == LayerInitializer.Default ? LayerInitializer.Random : biasInit,
+                  skipInit
+            )
+        {
+        }
         public override void Activate(Layer previous)
         {
             for (int j = 0; j < Size; j++)

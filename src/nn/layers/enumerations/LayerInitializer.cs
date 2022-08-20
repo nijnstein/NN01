@@ -9,6 +9,11 @@ namespace NN01
     public enum LayerInitializer
     {
         /// <summary>
+        /// default to activation default
+        /// </summary>
+        Default = 0,
+
+        /// <summary>
         /// used in linear modes
         /// </summary>
         Zeros,

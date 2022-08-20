@@ -9,7 +9,17 @@ namespace NN01
     public class SigmoidLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Sigmoid;
-        public SigmoidLayer(int size, int previousSize) : base(size, previousSize, LayerInitializer.Normal, LayerInitializer.Random) { }
+        public SigmoidLayer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Default, LayerInitializer biasInit = LayerInitializer.Default, bool skipInit = false)
+            : base
+            (
+                  size,
+                  previousSize,
+                  weightInit == LayerInitializer.Default ? LayerInitializer.Normal : weightInit,
+                  biasInit == LayerInitializer.Default ? LayerInitializer.Random : biasInit,
+                  skipInit
+            )
+        {
+        }
         public override void Activate(Layer previous)
         {
             for (int j = 0; j < Size; j++)

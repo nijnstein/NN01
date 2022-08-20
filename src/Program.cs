@@ -4,13 +4,9 @@ using System.Diagnostics;
 
 
 
-const int populationCount = 100;
-
 const int patternCount = 16;
 const int testPatternCount = 6;
-
 const int classCount = 1;   // actually its 2, there is always class 0 -> unclassified 
-const int steps = 10000;
 
 
 float[][] trainingPatterns = new float[patternCount][]
@@ -73,8 +69,8 @@ do
     Console.WriteLine($">          Structure: {nn.ToString()}");
     Console.WriteLine($">         Input Size: {nn.Input.Size.ToString()}");
     Console.WriteLine($">        Class Count: {nn.Output.Size.ToString()}");
-    Console.WriteLine($">         Population: {populationCount}");
-    Console.WriteLine($">              Steps: {steps}");
+    Console.WriteLine($">         Population: {Trainer.Settings.Default.Population}");
+    Console.WriteLine($">              Steps: {Trainer.Settings.Default.Steps}");
     Console.WriteLine($">  Training patterns: {trainingPatterns.Length}");
     Console.WriteLine($">      Test patterns: {testPatterns.Length}");
     Console.WriteLine("");
@@ -94,9 +90,7 @@ do
             (cost, fitness) =>
             {
                 return fitness > 0.999f && (cost < 0.005f);
-            },
-            steps, 
-            populationCount
+            }
     ); 
 
     sw.Stop();
@@ -104,7 +98,7 @@ do
     Console.WriteLine($"Training Completed:");
     Console.WriteLine("");
     Console.WriteLine($">          Time: {sw.Elapsed.TotalMilliseconds.ToString("0.000")}ms");
-    Console.WriteLine($">      Steptime: {(sw.Elapsed.TotalMilliseconds / (stepsTrained * populationCount)).ToString("0.000")}ms");
+    Console.WriteLine($">      Steptime: {(sw.Elapsed.TotalMilliseconds / (stepsTrained * Trainer.Settings.Default.Population)).ToString("0.000")}ms");
     Console.WriteLine($"> Steps trained: {stepsTrained}");
     Console.WriteLine($">          Cost: {nn.Cost.ToString("0.0000000")}");
     Console.WriteLine($">       Fitness: {nn.Fitness.ToString("0.0000000")}");
