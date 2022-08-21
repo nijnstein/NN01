@@ -18,36 +18,36 @@ namespace NN01
         }
         static public Layer ReadLayer(this BinaryReader r)
         {
-            int size = r.ReadInt32(); 
+            int size = r.ReadInt32();
             int previousSize = r.ReadInt32();
 
-            LayerActivationFunction act = r.ReadLayerActivationFunction(); 
+            LayerActivationFunction act = r.ReadLayerActivationFunction();
             LayerInitializer biasInit = r.ReadLayerInitializer();
             LayerInitializer weightInit = r.ReadLayerInitializer();
 
-            Layer layer = NeuralNetwork.CreateLayer(size, previousSize, act, weightInit, biasInit, true); 
+            Layer layer = NeuralNetwork.CreateLayer(size, previousSize, act, weightInit, biasInit, true);
 
             if (previousSize > 0) // == IsInput 
             {
                 for (int i = 0; i < size; i++)
                 {
-                    layer.Biases[i] = r.ReadSingle(); 
+                    layer.Biases[i] = r.ReadSingle();
                 }
                 for (int i = 0; i < layer.Size; i++)
                 {
                     for (int j = 0; j < layer.PreviousSize; j++)
                     {
-                        layer.Weights[i][j] = r.ReadSingle(); 
+                        layer.Weights[i][j] = r.ReadSingle();
                     }
                 }
             }
 
-            return layer; 
+            return layer;
         }
 
         static public NeuralNetwork ReadNeuralNetwork(this BinaryReader r)
         {
-            return new NeuralNetwork(r); 
+            return new NeuralNetwork(r);
         }
     }
 }

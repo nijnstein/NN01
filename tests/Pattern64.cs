@@ -36,7 +36,7 @@ namespace NN01.Tests
               new int[]
               {
                   patternSize,
-                  32, 16, 1
+                  48, 24, 1
               },
               new LayerActivationFunction[] {
                     LayerActivationFunction.ReLU,

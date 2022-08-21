@@ -1,9 +1,12 @@
 # NN01
 My first neural since computers became fast :) 
 
-NN01 represents the first classifier in my tobe pattern classification library based on machine learning methods written from scratch.  
+# Architecture
+NN01 uses a classic backpropagating neural network with multiple hidden layers
 
 # Usage
+NN01 can be used to classify 1D sequences:
+
 ```csharp
       
        float[][] trainingPatterns = new float[patternCount][]
@@ -181,3 +184,5 @@ NN01 represents the first classifier in my tobe pattern classification library b
         Binary,
         None
 ```
+
+ 
