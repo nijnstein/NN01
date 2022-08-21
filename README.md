@@ -81,6 +81,95 @@ NN01 represents the first classifier in my tobe pattern classification library b
 
 ```
 
+# Fitness evaluation can be modified to suit environment
+```csharp
+       NeuralNetwork nn = new NeuralNetwork(
+           new int[]
+           { 
+               patternSize,
+               32, 16, 1
+           },
+           new LayerActivationFunction[] {
+               LayerActivationFunction.ReLU,
+               LayerActivationFunction.LeakyReLU,// Swish,
+               LayerActivationFunction.LeakyReLU,
+           }
+       );
+
+       Trainer.Settings settings = new Trainer.Settings();
+       settings.Population = 100;
+       settings.Steps = 1000; 
+       settings.ReadyEstimator = (cost, fitness) =>
+       {
+           return fitness > 0.99f && (cost < 0.2f);
+       };
+       settings.FitnessEstimator = (network, patterns, labels) =>
+            {
+                float fittness = 0;
+                int c = 0;
+                for (int k = 0; k < labels.Length; k++)
+                {
+                    float[] output = network.FeedForward(patterns[k]);
+                    float[] label = labels[k];
+
+                    for (int l = 0; l < output.Length; l++)
+                    {
+                        float d = label[l] - output[l];
+                        fittness += d * d;
+                        c++;
+                    }
+                }
+                return 1f - Math.Max(0f, Math.Min(1f, fittness / c));
+            };
+       
+       Trainer.Train
+            (
+                    nn,
+                    new float[][]
+                    {
+                        GetBitPattern("JA"),
+                        GetBitPattern("YES"),
+                        GetBitPattern("JAWEL"),
+                        GetBitPattern("OK"),
+                        
+                        GetBitPattern("TRUE"),
+                        GetBitPattern("WAAR"),
+                        GetBitPattern("YEAH"),
+                        GetBitPattern("1"),
+                        
+                        GetBitPattern("NEE"),
+                        GetBitPattern("NEEN"),
+                        GetBitPattern("NO"),
+                        GetBitPattern("NOT OK"),
+                        
+                        GetBitPattern("NOT"),
+                        GetBitPattern("FALSE"),
+                        GetBitPattern("ONWAAR"),
+                        GetBitPattern("NIET"),
+
+                        GetBitPattern("0"),
+                   },
+                    new int[]
+                    {
+                        1,1,1,1,
+                        1,1,1,1, 
+                        0,0,0,0,
+                        0,0,0,0,
+                        0
+                    },
+                    new float[][]
+                    {
+                        GetBitPattern("JA"),
+                        GetBitPattern("NEE"),
+                    },
+                    new int[]
+                    {
+                        1, 0
+                    },
+                    settings
+            );
+```
+
 # Activation Functions:
 
 ```csharp
