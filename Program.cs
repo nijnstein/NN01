@@ -6,7 +6,7 @@ do
     Console.WriteLine("");
     Console.WriteLine("");
     
-    new Pattern256x8().Run();
+    new Pattern64().Run();
 
     Console.WriteLine("");
     Console.WriteLine("");

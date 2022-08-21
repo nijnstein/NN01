@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 
 namespace NN01.Tests
 {
-    public class Pattern256x8
+    public class Pattern64
     {
         int patternSize = 64;
 
-        float[] GetPattern(string sample)
+        float[] GetBitPattern(string sample)
         {
             float[] output = new float[patternSize];
 
@@ -40,7 +40,7 @@ namespace NN01.Tests
               },
               new LayerActivationFunction[] {
                     LayerActivationFunction.ReLU,
-                    LayerActivationFunction.LeakyReLU,// Swish,
+                    LayerActivationFunction.Swish,
                     LayerActivationFunction.LeakyReLU,
               }
             );
@@ -50,7 +50,7 @@ namespace NN01.Tests
             settings.Steps = 1000; 
             settings.ReadyEstimator = (cost, fitness) =>
             {
-                return fitness > 0.99f && (cost < 0.2f);
+                return fitness > 0.99f && (cost < 0.01f);
             };
 
             Console.WriteLine($"Training network");
@@ -71,27 +71,27 @@ namespace NN01.Tests
                     nn,
                     new float[][]
                     {
-                        GetPattern("JA"),
-                        GetPattern("YES"),
-                        GetPattern("JAWEL"),
-                        GetPattern("OK"),
+                        GetBitPattern("JA"),
+                        GetBitPattern("YES"),
+                        GetBitPattern("JAWEL"),
+                        GetBitPattern("OK"),
                         
-                        GetPattern("TRUE"),
-                        GetPattern("WAAR"),
-                        GetPattern("YEAH"),
-                        GetPattern("1"),
+                        GetBitPattern("TRUE"),
+                        GetBitPattern("WAAR"),
+                        GetBitPattern("YEAH"),
+                        GetBitPattern("1"),
                         
-                        GetPattern("NEE"),
-                        GetPattern("NEEN"),
-                        GetPattern("NO"),
-                        GetPattern("NOT OK"),
+                        GetBitPattern("NEE"),
+                        GetBitPattern("NEEN"),
+                        GetBitPattern("NO"),
+                        GetBitPattern("NOT OK"),
                         
-                        GetPattern("NOT"),
-                        GetPattern("FALSE"),
-                        GetPattern("ONWAAR"),
-                        GetPattern("NIET"),
+                        GetBitPattern("NOT"),
+                        GetBitPattern("FALSE"),
+                        GetBitPattern("ONWAAR"),
+                        GetBitPattern("NIET"),
 
-                        GetPattern("0"),
+                        GetBitPattern("0"),
                    },
                     new int[]
                     {
@@ -103,8 +103,8 @@ namespace NN01.Tests
                     },
                     new float[][]
                     {
-                        GetPattern("JA"),
-                        GetPattern("NEE"),
+                        GetBitPattern("JA"),
+                        GetBitPattern("NEE"),
                     },
                     new int[]
                     {
@@ -137,7 +137,7 @@ namespace NN01.Tests
         // show results for a single test 
         void Test(NeuralNetwork network, bool inset, string pattern, int classIndex)
         {
-            float[] data = GetPattern(pattern); 
+            float[] data = GetBitPattern(pattern); 
 
             ConsoleColor prev = Console.ForegroundColor;
             float[] outputs = network.FeedForward(data);

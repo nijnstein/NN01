@@ -71,7 +71,7 @@ namespace NN01
             }
         }
 
-        public NeuralNetwork(NeuralNetwork other)
+        public NeuralNetwork(NeuralNetwork other, bool clone = true)
         {
             layers = new Layer[other.layers.Length];
 
@@ -85,11 +85,14 @@ namespace NN01
                     other.layers[i].ActivationType,
                     other.layers[i].WeightInitializer,
                     other.layers[i].BiasInitializer,
-                    true
+                    !clone
                 );
             }
 
-            other.DeepClone(this);
+            if (clone)
+            {
+                other.DeepClone(this);
+            }
         }
         
         internal static Layer CreateLayer(int size, int previousSize = 0, LayerActivationFunction activationType = LayerActivationFunction.None, LayerInitializer weightInit = LayerInitializer.Default, LayerInitializer biasInit = LayerInitializer.Default, bool skipInitializers = false)
@@ -257,6 +260,13 @@ namespace NN01
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// reset weights and biases
+        /// </summary>
+        public void Reset()
+        { 
         }
 
         public void DeepClone(NeuralNetwork into)

@@ -26,14 +26,12 @@ namespace NN01
             if (fitnessEstimator == null) fitnessEstimator = settings.FitnessEstimator;
             if (readyEstimator == null) readyEstimator = settings.ReadyEstimator;
 
-            // initialize a mutated population 
+            // initialize a population 
             List<NeuralNetwork> networks = new List<NeuralNetwork>(settings.Population);
             networks.Add(network);
             for (int i = 1; i < settings.Population; i++)
             {
-                NeuralNetwork clone = network.DeepCopy();
-                clone.Mutate(1, settings.MutationStrength);
-                networks.Add(clone);
+                networks.Add(new NeuralNetwork(network, false));
             }
 
             int istep = 0;
