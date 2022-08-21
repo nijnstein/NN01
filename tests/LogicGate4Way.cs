@@ -109,9 +109,6 @@ namespace NN01.Tests
             {
                 Test(nn, string.Join(' ', testPatterns[i]).PadRight(32), testPatterns[i], testClasses[i]);
             }
-
-            // reflect pattern 
-            Reflect(nn, new float[] { 0, 1, 0, 1 });
         }
 
 
