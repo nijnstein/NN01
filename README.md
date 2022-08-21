@@ -1,7 +1,7 @@
 # NN01
 My first neural since computers became fast :) 
 
-NN01 represents the first classifier in my tobe pattern classification library based on machine learning methods. 
+NN01 represents the first classifier in my tobe pattern classification library based on machine learning methods written from scratch.  
 
 # Usage
 ```csharp
