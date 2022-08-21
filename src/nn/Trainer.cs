@@ -83,7 +83,7 @@ namespace NN01
                         if (readyEstimator(networks[j].Cost, networks[j].Fitness))
                         {
                             // clone best mutation into source network 
-                            networks[settings.Population - 1].DeepClone(network);
+                            networks[j].DeepClone(network);
                             goto ready;
                         }
                     }
@@ -95,7 +95,7 @@ namespace NN01
                     :
                     Math.Max(settings.FinalMomentum, currentMomentum * settings.MomentumChange);
 
-                // update momemtum 
+                // update weight resistance 
                 currentWeightCost = (settings.FinalWeightCost > settings.InitialWeightCost) ?
                     Math.Min(settings.FinalWeightCost, currentWeightCost * settings.WeightCostChange)
                     :
