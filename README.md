@@ -4,7 +4,7 @@ My first neural since computers became fast :)
 NN01 represents the first classifier in my tobe pattern classification library based on machine learning methods. 
 
 # Usage
-'''csharp
+```csharp
       
        float[][] trainingPatterns = new float[patternCount][]
        {
@@ -79,4 +79,16 @@ NN01 represents the first classifier in my tobe pattern classification library b
        // test if class 1 
        bool isClass1 = network.FeedForward(testPattern[0])[0] > 0.5f; 
 
-''' 
+```
+
+# Activation Functions:
+
+```csharp
+        Sigmoid,
+        Tanh,
+        ReLU,
+        LeakyReLU,
+        Swish,
+        Binary,
+        None
+```
