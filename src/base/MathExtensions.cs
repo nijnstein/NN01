@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+
+
+using Avx2 = System.Runtime.Intrinsics.X86.Avx2;
 
 namespace NN01 
 {
@@ -12,7 +16,7 @@ namespace NN01
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Sigmoid(this float f)
         {
-            f = (float)Math.Exp(f);
+            f = MathF.Exp(f);
             return f / (1.0f + f);
         }
 
@@ -33,7 +37,7 @@ namespace NN01
         {
             // see
             // https://sefiks.com/2018/08/21/swish-as-neural-networks-activation-function/
-            float e = 1f + (float)Math.Exp(-f);
+            float e = 1f + MathF.Exp(-f);
             return (f * e + (e - f)) / (e * e);
         }
 
@@ -78,7 +82,7 @@ namespace NN01
                 float summed = 0;
                 for (int i = 0; i < input.Length; i++)
                 {
-                    float ex = (float)Math.Exp(input[i]);
+                    float ex = MathF.Exp(input[i]);
                     summed += ex;
                     output[i] = ex;
                 }
@@ -99,7 +103,7 @@ namespace NN01
 
             for (int i = 0; i < input.Length; i++)
             {
-                float ex = (float)Math.Exp(input[i]) - max;
+                float ex = MathF.Exp(input[i]) - max;
                 summed += ex;
                 output[i] = ex;
             }
@@ -113,8 +117,8 @@ namespace NN01
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float CDFNormal(this float x, float mean, float sd)
         {
-            float p = 1f / (float)Math.Sqrt(2f * (float)Math.PI * (sd * sd));
-            return p * (float)Math.Exp(-0.5f * ((x - mean) * (x - mean)) / (sd * sd));
+            float p = 1f / MathF.Sqrt(2f * MathF.PI * (sd * sd));
+            return p * MathF.Exp(-0.5f * ((x - mean) * (x - mean)) / (sd * sd));
         }
 
 
@@ -132,7 +136,7 @@ namespace NN01
             float x2 = 1 - random.NextSingle();
 
             // by replacing cos with sin we can generate a second distribution 
-            float y1 = (float)Math.Sqrt(-2f * (float)Math.Log(x1)) * (float)Math.Cos(2f * (float)Math.PI * x2);
+            float y1 = MathF.Sqrt(-2f * MathF.Log(x1)) * MathF.Cos(2f * (float)Math.PI * x2);
             return y1 * sd + mean;
         }
 
@@ -156,9 +160,40 @@ namespace NN01
             }
         }
 
+        /// <summary>
+        /// same as minmax over region 
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float HardTanH(this float f, float min = -1f, float max = 1f)
+        {
+            if (f < min) return min;
+            if (f > max) return max;
+            return f; 
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float MinMax(this float f, float min = -1f, float max = 1f)
+        {
+            return Math.Min(max, Math.Max(min, f)); 
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Range(this Random random, float low, float high) => random.NextSingle() * (high - low) + low;
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Zero(this float[] a)
+        {
+            for (int i = 0; i < a.Length; i++) a[i] = 0f;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Ones(this float[] a)
+        {
+            for (int i = 0; i < a.Length; i++) a[i] = 1f;
+        }
+
 
     }
 }

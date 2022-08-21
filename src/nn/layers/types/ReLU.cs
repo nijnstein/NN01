@@ -23,14 +23,24 @@ namespace NN01
 
         public override void Activate(Layer previous)
         {
+            Span<float> values = stackalloc float[previous.Size]; 
+
             for (int j = 0; j < Size; j++)
             {
-                // weighted sum of (w[j][k] * n[i][k])
+                // multiply weight with input neuron 
+                for (int k = 0; k < previous.Size; k++)
+                {
+                    values[k] = Weights[j][k] * previous.Neurons[k];
+                }
+
+                // column sum
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += Weights[j][k] * previous.Neurons[k];
+                    value += values[k];
                 }
+
+                value += Biases[j]; 
 
                 // relu 
                 Neurons[j] = Math.Max(value, 0);
@@ -42,7 +52,7 @@ namespace NN01
 
             for (int i = 0; i < Size; i++)
             {
-                gamma[i] = delta[i] * (target[i] < 0 ? 0f : 1f);
+                gamma[i] = delta[i] * (target[i] < 0 ? 0f : 1f); // * Biases[i];
             }
         }
     }

@@ -20,6 +20,11 @@ namespace NN01
         Ones,
 
         /// <summary>
+        /// distribute 1 evenly over all elements
+        /// </summary>
+        Uniform,
+
+        /// <summary>
         /// Rectified Linear modes 
         /// </summary>
         Random,

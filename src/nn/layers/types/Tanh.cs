@@ -30,6 +30,9 @@ namespace NN01
                 {
                     value += Weights[j][k] * previous.Neurons[k];
                 }
+
+                value += Biases[j];
+
                 Neurons[j] = (float)Math.Tanh(value);
             }
         }

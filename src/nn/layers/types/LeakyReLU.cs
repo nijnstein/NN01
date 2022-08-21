@@ -22,22 +22,32 @@ namespace NN01
         }
         public override void Activate(Layer previous)
         {
+            Span<float> values = stackalloc float[previous.Size];
+
             for (int j = 0; j < Size; j++)
             {
-                // weighted sum of (w[j][k] * n[i][k])
+                // multiply weight with input neuron 
+                for (int k = 0; k < previous.Size; k++)
+                {
+                    values[k] = Weights[j][k] * previous.Neurons[k];
+                }
+
+                // column sum
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += Weights[j][k] * previous.Neurons[k];
+                    value += values[k];
                 }
 
-                // relu 
-                Neurons[j] = value < 0 ? (float)Math.Exp(value) - 1 : value;
+                // apply bias
+                value += Biases[j];
+                      
+                // leaky relu 
+                Neurons[j] = value < 0 ? MathF.Exp(value) - 1 : value;
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
         {
-            // gamma == difference times  activationDerivative(neuron value)
             for (int i = 0; i < Size; i++)
             {
                 gamma[i] = delta[i] * (target[i] < 0 ? 0.01f : 1f);

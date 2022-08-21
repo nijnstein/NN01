@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 
 namespace NN01
 {
-
-
     public class NeuralNetwork : IComparable
     {
         private Layer[] layers;
@@ -25,7 +23,6 @@ namespace NN01
             }
         }
 
-
         public int LayerCount => layers == null ? 0 : layers.Length;
 
         public Layer Input => this[0];
@@ -33,6 +30,10 @@ namespace NN01
 
         public NeuralNetwork(int[] layerSizes, LayerActivationFunction[] activations)
         {
+            if (layerSizes == null) throw new ArgumentNullException("layerSizes");
+            if (activations == null) throw new ArgumentNullException("activations");
+            if (layerSizes.Length <= 2 || activations.Length <= 1 || layerSizes.Length != activations.Length + 1) throw new ArgumentOutOfRangeException("there must be at least 3 layers and activations must be 1 index shorter as they sit between layers");
+
             layers = new Layer[layerSizes.Length];
 
             layers[0] = CreateLayer(layerSizes[0]);
@@ -41,9 +42,10 @@ namespace NN01
                 layers[i] = CreateLayer(layerSizes[i], layerSizes[i - 1] , activations[i - 1]);
             }
         }
-        public NeuralNetwork(Layer[] _layers)
+        public NeuralNetwork(Layer[] layers)
         {
-            layers = _layers; 
+            if (layers == null) throw new ArgumentNullException("layers"); 
+            this.layers = layers; 
         }
 
         public NeuralNetwork(Stream stream) : this(new BinaryReader(stream))
@@ -52,6 +54,8 @@ namespace NN01
 
         public NeuralNetwork(BinaryReader r)
         {
+            if (r == null) throw new ArgumentNullException("binaryreader r");
+
             string magic = r.ReadString();
             if (string.Compare(magic, "NN01", false) != 0) throw new InvalidFormatException("stream does not contain data in correct format for reading in a neural network (magic marker not present)");
 
@@ -108,19 +112,11 @@ namespace NN01
 
                 case LayerActivationFunction.Sigmoid:
                     return new SigmoidLayer(size, previousSize, weightInit, biasInit, skipInitializers);
-
-                case LayerActivationFunction.SoftMax:
-                    return new SoftMaxLayer(size, previousSize, weightInit, biasInit, skipInitializers);
                     
                 case LayerActivationFunction.Swish:
                     return new SwishLayer(size, previousSize, weightInit, biasInit, skipInitializers);
 
-                case LayerActivationFunction.Linear:
-                    // reduces model to linear regression, no backprop 
-                    return new LinearLayer(size, previousSize, weightInit, biasInit, skipInitializers);
-
                 case LayerActivationFunction.Binary:
-                    // no backprop 
                     return new BinaryLayer(size, previousSize, weightInit, biasInit, skipInitializers);
             }
 
@@ -153,7 +149,7 @@ namespace NN01
             // set input 
             for (int i = 0; i < inputs.Length; i++)
             {
-                layers[0].Neurons[i] = inputs[i];
+                Input.Neurons[i] = inputs[i];
             }
 
             // propagate state through layers 
@@ -164,53 +160,55 @@ namespace NN01
             }
 
             // return the output neuron state 
-            return layers[layers.Length - 1].Neurons;
+            return Output.Neurons;
         }
 
-
-
-        public void BackPropagate(float[] inputs, float[] expected, float learningRate = 0.01f)
+        public float[] FeedBackward(float[] outputs)
         {
-            // ensure proper neuron populations
-            float[] output = FeedForward(inputs);
+            // set output|last layer 
+            for (int i = 0; i < outputs.Length; i++)
+            {
+                Output.Neurons[i] = outputs[i];
+            }
+
+            // now propagate backwards
+            for (int i = LayerCount - 1; i > 0; i--)
+            {
+                Layer previous = layers[i - 1];
+                Layer current = layers[i]; 
+
+                // TODO              BackPropagate(current.)
+            }
+
+            return Input.Neurons;
+        }
+
+        /// <summary>
+        /// backtrack state through derivates of the activation minimizing cost/error
+        /// </summary>
+        public void BackPropagate(
+            float[] inputs, float[] expected, float[][] gamma, 
+            float weightLearningRate = 0.01f, float biasLearningRate = 0.01f, float momentum = 1f, float weightCost = 0.00001f)
+        {
+            // initialize neurons from input patterns
+            FeedForward(inputs);
 
             Cost = 0;
-            float[] delta = new float[output.Length];
+            float[] delta = new float[Output.Neurons.Length];
             for (int i = 0; i < delta.Length; i++)
             {
                 // precalculate delta 
-                delta[i] = output[i] - expected[i];
+                delta[i] = Output.Neurons[i] - expected[i];
 
                 // calculate cost of network 
                 Cost += (float)Math.Pow(delta[i], 2);
             }
 
-            // setup 'gamma'
-            float[][] gamma = new float[layers.Length][];
-            for (int i = 0; i < layers.Length; i++)
-            {
-                gamma[i] = new float[layers[i].Size];
-            }
-
             // calculate 'gamma' for the last layer
-            layers[layers.Length - 1].CalculateGamma(delta, gamma[layers.Length - 1], output);
+            Output.CalculateGamma(delta, gamma[layers.Length - 1], Output.Neurons);
 
             // calculate new weights and biases for the last layer in the network 
-            for (int i = 0; i < layers[layers.Length - 1].Size; i++)
-            {
-                layers[layers.Length - 2].Biases[i] -= gamma[layers.Length - 1][i] * learningRate;
-
-                // apply some learning... move in direction of result using gamma 
-                for (int j = 0; j < layers[layers.Length - 2].Size; j++)
-                {
-                    layers[layers.Length - 1].Weights[i][j]
-                        -=
-                        gamma[layers.Length - 1][i]
-                        *
-                        layers[layers.Length - 2].Neurons[j]
-                        * learningRate;
-                }
-            }
+            Output.Update(layers[layers.Length - 2], gamma[layers.Length - 1], weightLearningRate, biasLearningRate, momentum, weightCost);
 
             // now propagate backward 
             for (int i = layers.Length - 2; i > 0; i--)
@@ -224,28 +222,18 @@ namespace NN01
                         gamma[i][j] += gamma[i + 1][k] * layers[i + 1].Weights[k][j];
                     }
 
-                    layers[i].CalculateGamma(gamma[i]);
+                    layers[i].CalculateGamma(gamma[i], gamma[i], layers[i].Neurons);
                 }
 
-                // modify bias to outputlayer 
-                for (int j = 0; j < layers[i].Size; j++)
-                {
-                    // update bias 
-                    layers[i].Biases[j] -= gamma[i][j] * learningRate;
-
-                    // modify weight to this layers inputs
-                    for (int k = 0; k < layers[i - 1].Size; k++)
-                    {
-                        layers[i].Weights[j][k] -= gamma[i][j] * layers[i - 1].Neurons[k] * learningRate;
-                    }
-                }
+                // update layer weights and biases
+                layers[i].Update(layers[i - 1], gamma[i], weightLearningRate, biasLearningRate, momentum, weightCost); 
             }
         }
 
-
-
-
-        public void Mutate(int high, float val) //used as a simple mutation function for any genetic implementations.
+        /// <summary>
+        /// randomly mutate some of the worst networks
+        /// </summary>
+        public void Mutate(int high, float val) 
         {
             for (int i = 1; i < LayerCount; i++)
             {
@@ -343,9 +331,6 @@ namespace NN01
             else
                 return 0;
         }
-
     }
-
-
 }
 

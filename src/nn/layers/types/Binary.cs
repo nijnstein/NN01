@@ -30,16 +30,17 @@ namespace NN01
                     value += Weights[j][k] * previous.Neurons[k];
                 }
 
+                value += Biases[j];
+
                 Neurons[j] = value < 0 ? 0 : 1;
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
         {
-            // gamma == difference times  activationDerivative(neuron value)
-
+            // a binary activation has no gradient, thus in the backward pass an STE (straight through estimator) is used 
             for (int i = 0; i < Size; i++)
             {
-                gamma[i] = delta[i] * (target[i] < 0 ? 0f : 1f);
+                gamma[i] = delta[i] * target[i].HardTanH(-0.5f, 0.5f);
             }
         }
     }

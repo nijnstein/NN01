@@ -31,8 +31,11 @@ namespace NN01
                     value += Weights[j][k] * previous.Neurons[k];
                 }
 
+                // apply bias
+                value += Biases[j];
+
                 // sigmoid activation  
-                float f = (float)Math.Exp(value);
+                float f = MathF.Exp(value);
                 Neurons[j] = f / (1.0f + f);
             }
         }

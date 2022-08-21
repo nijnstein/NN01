@@ -21,14 +21,7 @@ namespace NN01
         /// Leaky Rectified Linear Unit
         /// </summary>
         LeakyReLU,
-
-        SoftMax,
-
-        /// <summary>
-        /// reduces to linear regression
-        /// </summary>
-        Linear,
-
+ 
         /// <summary>
         /// swish by google 
         /// </summary>
