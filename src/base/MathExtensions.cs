@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -11,7 +12,7 @@ using Avx2 = System.Runtime.Intrinsics.X86.Avx2;
 
 namespace NN01 
 {
-    static public class MathExtensions
+    static public partial class MathEx
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Sigmoid(this float f)
@@ -66,7 +67,7 @@ namespace NN01
         }
 
 
-        public static void Softmax(ReadOnlySpan<float> input, Span<float> output, bool stable = false)
+        public static void Softmax(this Span<float> input, Span<float> output, bool stable = false)
         {
             // softmax == each exponent of every component divided by the sum of of all exponents 
             if (stable)
@@ -194,6 +195,98 @@ namespace NN01
             for (int i = 0; i < a.Length; i++) a[i] = 1f;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Clamp01(this float f)
+        {
+            return Math.Max(0, Math.Min(1, f));
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Clamp(this float f, float a, float b)
+        {
+            return Math.Max(a, Math.Min(b, f));
+        }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Sign(this float f)
+        {
+            return f >= 0 ? 1 : -1;
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMax(this Span<float> f)
+        {
+            float max = float.MinValue;
+            int j = -1;
+            unchecked
+            {
+                for (int i = 0; i < f.Length; i++)
+                {
+                    if (f[i] > max)
+                    {
+                        max = f[i];
+                        j = i;
+                    }
+                }
+            }
+            return j;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMin(this Span<float> f)
+        {
+            float min = float.MaxValue;
+            int j = -1; 
+            unchecked
+            {
+                for (int i = 0; i < f.Length; i++)
+                {
+                    if (f[i] < min)
+                    {
+                        min = f[i];
+                        j = i;
+                    }
+                }
+            }
+            return j;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMax(this ReadOnlySpan<float> f)
+        {
+            float max = float.MinValue;
+            int j = -1;
+            unchecked
+            {
+                for (int i = 0; i < f.Length; i++)
+                {
+                    if (f[i] > max)
+                    {
+                        max = f[i];
+                        j = i;
+                    }
+                }
+            }
+            return j;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMin(this ReadOnlySpan<float> f)
+        {
+            float min = float.MaxValue;
+            int j = -1;
+            unchecked
+            {
+                for (int i = 0; i < f.Length; i++)
+                {
+                    if (f[i] < min)
+                    {
+                        min = f[i];
+                        j = i;
+                    }
+                }
+            }
+            return j;
+        }
     }
 }

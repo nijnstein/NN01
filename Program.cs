@@ -1,4 +1,4 @@
-﻿using NN01.Tests;
+﻿/*using NN01.Tests;
 
 do
 {
@@ -18,3 +18,4 @@ do
 while (Console.ReadKey().Key == ConsoleKey.Spacebar);
 
 
+  */

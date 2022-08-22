@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace NN01
 {
-    public static partial class Trainer
+    public partial class Trainer
     {
         public class Settings
         {

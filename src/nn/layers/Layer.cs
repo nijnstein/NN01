@@ -125,7 +125,7 @@ namespace NN01
 
                 case LayerInitializer.Uniform:
                     {
-                        MathExtensions.Uniform(data, 1f);
+                        MathEx.Uniform(data, 1f);
                     }
                     break; 
             }
