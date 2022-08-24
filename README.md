@@ -1,6 +1,4 @@
 # NN01
-My first neural since computers became fast :) 
-
 # Architecture
 NN01 uses a classic backpropagating neural network with multiple hidden layers
 
