@@ -1,7 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -160,35 +164,102 @@ namespace NN01
                 InitializeDeltaBuffers();
             }
 
-            Span<float> weightDelta = stackalloc float[previous.Size];
-            Span<float> weightMomentum = stackalloc float[previous.Size];
+            Vector256<float> wRate;
+            Vector256<float> wCost;
+            Span<Vector256<float>> prev; 
+            if (Avx.IsSupported)
+            {
+                wRate = Vector256.Create(weightLearningRate);
+                wCost = Vector256.Create(weightCost);
+                prev = MemoryMarshal.Cast<float, Vector256<float>>(previous.Neurons);
+            }
+            else
+            {
+                wRate = default;
+                wCost = default;
+                prev = default; 
+            }
 
-            Span<float> biasDelta = stackalloc float[Size];
-            Span<float> biasMomentum = stackalloc float[Size];
 
-            Intrinsics.MultiplyScalar(gamma, biasLearningRate, biasDelta);
-            Intrinsics.MultiplyScalar(BiasDeltas!, momentum, biasMomentum);
-
+            if (Avx.IsSupported)
+            {
+                Span<Vector256<float>> b = MemoryMarshal.Cast<float, Vector256<float>>(Biases!);
+                Span<Vector256<float>> bDelta = MemoryMarshal.Cast<float, Vector256<float>>(BiasDeltas!);
+                Span<Vector256<float>> gi = MemoryMarshal.Cast<float, Vector256<float>>(gamma);
+                int i = 0, ii = 0; 
+                while (i < (Size & ~7))
+                {
+                    Vector256<float> deltaBias = Avx.Multiply(gi[ii], Vector256.Create(biasLearningRate));
+                    b[ii] = Avx.Subtract(b[ii], Avx.Add(deltaBias, Avx.Multiply(bDelta[ii], Vector256.Create(momentum))));
+                    bDelta[ii] = deltaBias; 
+                    ii += 1;
+                    i += 8; 
+                }
+                while(i < Size)
+                {
+                    float delta = gamma[i] * biasLearningRate;
+                    Biases[i] -= delta + (BiasDeltas![i] * momentum);
+                    BiasDeltas![i] = delta;
+                    i++;
+                }
+            }
+            
             // calculate new weights and biases for the last layer in the network 
             for (int i = 0; i < Size; i++)
             {
-                Biases[i] -= biasDelta[i] + biasMomentum[i];
-                BiasDeltas![i] = biasDelta[i];   // intrinsics.Move()
+                if (!Avx.IsSupported)
+                {
+                    float delta = gamma[i] * biasLearningRate;
+                    Biases[i] -= delta + (BiasDeltas![i] * momentum);
+                    BiasDeltas![i] = delta;
+                }
 
                 // apply some learning... move in direction of result using gamma 
-
-                Intrinsics.MultiplyScalar(previous.Neurons, gamma[i] * weightLearningRate, weightDelta);
-                Intrinsics.MultiplyScalar(WeightDeltas![i], momentum, weightMomentum);
-
-                for (int j = 0; j < previous.Size; j++)
+                int j = 0;
+                if (Avx.IsSupported)
                 {
-                    Weights[i][j] -=
-                        // delta 
-                        weightDelta[j] + weightMomentum[j]
-                        // strengthen learned weights
-                        + (weightLearningRate * (gamma[i] - weightCost * Weights[i][j]));
+                    Vector256<float> g = Vector256.Create(gamma[i]);
+                    Vector256<float> gw = Vector256.Create(gamma[i] * weightLearningRate);
+                    Span<Vector256<float>> w = MemoryMarshal.Cast<float, Vector256<float>>(Weights[i]);
 
-                    WeightDeltas[i][j] = weightDelta[j]; 
+                    int jj = 0; 
+                    while (j < (previous.Size & ~7))
+                    {
+                        Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(WeightDeltas![i]);
+
+                        Vector256<float> d = Avx.Multiply(prev[jj], gw);
+                        w[jj] =
+                            Avx.Subtract(w[jj], 
+                            // delta 
+                            Avx.Add(
+                                Avx.Add(d,Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
+                                // strengthen learned weights
+                                Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost,w[jj])))
+                            ));
+
+                        wDelta[jj] = d;
+                        j += 8;
+                        jj++;
+                    }
+                }
+                unchecked
+                {
+                    while (j < previous.Size)
+                    {
+                        float delta = previous.Neurons[j] * gamma[i] * weightLearningRate;
+
+                        Weights[i][j] -=
+                            // delta 
+                            delta
+                            // momentum 
+                            + (WeightDeltas![i][j] * momentum)
+                            // strengthen learned weights
+                            + (weightLearningRate * (gamma[i] - weightCost * Weights[i][j]));
+
+                        WeightDeltas[i][j] = delta;
+
+                        j++;
+                    }
                 }
             }
         }
