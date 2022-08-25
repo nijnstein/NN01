@@ -193,25 +193,22 @@ namespace NN01
         /// <param name="action">action to perform on the lease</param>
         public void With(Action<Lease<T>> action)
         {
-            if (IsOwned)
-            {
-                GetPinnedPtr(
-                    items,
-                    (Action<IntPtr>)((ptr) =>
+            GetPinnedPtr(
+                items,
+                (Action<IntPtr>)((ptr) =>
+                    {
+                        Debug.Assert(!IsLeased, "AlignedBuffer already in use");
+                        IsLeased = true;
+                        try
                         {
-                            Debug.Assert(!IsLeased, "AlignedBuffer already in use");
-                            IsLeased = true;
-                            try
-                            {
-                                action(new Lease<T>(items, GetBase(ptr.ToInt64()), Size));
-                            }
-                            finally
-                            {
-                                IsLeased = false;
-                            }
-                        })
-                );
-            }
+                            action(new Lease<T>(items, GetBase(ptr.ToInt64()), Size));
+                        }
+                        finally
+                        {
+                            IsLeased = false;
+                        }
+                    })
+            );
         }
     }
 }
