@@ -8,6 +8,63 @@ namespace NN01
     static public partial class MathEx
     {                                                                                 
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Max(Span<float> a)
+        {
+            return Intrinsics.MaxUnaligned(a);
+            // assume unaligned if called through mathex
+
+
+            // in unsafe builds we could check for alignment on 256 borders then use intrinsics
+            // 
+            //  so  if using   MathEx.Max()  then if aligned  MathEx.Max uses Intrinsics 
+            // 
+            // return Intrinsics.Max(a); 
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Sum(Span<float> a)
+        {
+            return Intrinsics.SumUnaligned(a);
+        }
+
+        /// <summary>
+        /// only valid between -80 and 80
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Span<float> ExpFast(Span<float> a)
+        {
+            return Intrinsics.Exp(a, a);
+        }
+
+        /// <summary>
+        /// only valid between -80 and 80
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Span<float> ExpFast(Span<float> a, Span<float> output)
+        {
+            return Intrinsics.Exp(a, output);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Span<float> Exp(Span<float> a, Span<float> output)
+        {
+            unchecked
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    output[i] = MathF.Exp(a[i]);
+                }
+            }
+            return output;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Span<float> Exp(Span<float> a)
+        {
+            return Exp(a, a);
+        }
+
         public static void Softmax(this Span<float> input, Span<float> output, bool stable = false)
         {
             // softmax == each exponent of every component divided by the sum of of all exponents 
@@ -34,27 +91,6 @@ namespace NN01
                 }
             }
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float Max(Span<float> a)
-        {
-            return Intrinsics.MaxUnaligned(a);
-            // assume unaligned if called through mathex
-
-
-            // in unsafe builds we could check for alignment on 256 borders then use intrinsics
-            // 
-            //  so  if using   MathEx.Max()  then if aligned  MathEx.Max uses Intrinsics 
-            // 
-            // return Intrinsics.Max(a); 
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float Sum(Span<float> a)
-        {
-            return Intrinsics.SumUnaligned(a);
-        }
-
 
         /// <summary>
         /// stabelized softmax, max(input) is used to pull data into the negative in a reduced spread allowing exponentiation towards zero instead of infinity on large input values
@@ -173,7 +209,6 @@ namespace NN01
         {
             return f >= 0 ? 1 : -1;
         }
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ArgMax(this Span<float> f)

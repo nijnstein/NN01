@@ -1,6 +1,8 @@
 ﻿using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Validators;
+using NN01;
+using System.Runtime.CompilerServices;
 
 namespace UnitTests
 {
@@ -18,7 +20,7 @@ namespace UnitTests
         }
 
         static void Main(string[] args)
-        {
+        {             
             Console.WriteLine("Press [B] to benchmark, any other for test run.");
             if (Console.ReadKey().Key == ConsoleKey.B)
             {

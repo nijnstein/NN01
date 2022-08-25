@@ -1,17 +1,35 @@
 ﻿using BenchmarkDotNet.Attributes;
 using NN01;
+using NUnit.Framework;
 
 namespace UnitTests
 {
     
     public class Benchmark
     {
-        public float[] a = new float[]
+        static public float[] a = new float[]
         {
             12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 87, 4, 5, 1001,
             12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 87, 4, 5, 1001,
             12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 87, 4, 5, 1001
         };
+
+        private AlignedBuffer<float> buffer = new AlignedBuffer<float>(a.Length, 32, true);
+
+        [GlobalSetup]
+        public void InitBuffer()
+        {
+            buffer.With((lease) =>
+            {
+                Span<float> s = lease.AsSpan(); 
+
+                for(int i = 0; i < s.Length; i++)
+                {
+                    s[i] = 2f; 
+                }
+            });
+        }
+
 
 // |    Method |      Mean |    Error |   StdDev |
 // |---------- |----------:|---------:|---------:|
@@ -24,14 +42,30 @@ namespace UnitTests
 //        [Benchmark] public float MaxDotnet() => a.Max();
 
 
-// |    Method |      Mean |    Error |   StdDev |
-// |---------- |----------:|---------:|---------:|
-// |    SumAvx |  14.43 ns | 0.179 ns | 0.167 ns |
-// |   SumFast |  76.11 ns | 1.510 ns | 1.551 ns |
-// | SumDotnet | 458.25 ns | 5.504 ns | 5.149 ns |
+//|             Method |         Mean |      Error |     StdDev |
+//|------------------- |-------------:|-----------:|-----------:|
+//|             SumAvx |     14.43 ns |   0.315 ns |   0.481 ns |
+//|            SumFast |     76.68 ns |   1.533 ns |   1.825 ns |
+//|          SumDotnet |    459.62 ns |   3.549 ns |   3.320 ns |
+//| SumAvxAlignedx1000 | 15,237.94 ns | 198.302 ns | 185.491 ns |         looks like there is no penalty for misalignment on this machine..
         [Benchmark] public float SumAvx() => Intrinsics.Sum(a);
         [Benchmark] public float SumFast() => Intrinsics.SumUnaligned(a);
         [Benchmark] public float SumDotnet() => a.Sum();
+        [Benchmark] public void SumAvxAlignedx1000() => buffer.With((lease) => 
+        {
+            for (int i = 0; i < 1000; i++)
+            {
+                Intrinsics.Sum(lease.GetSpan(0, a.Length));
+            }
+        });
+
+ // | ExpAvxFast |  41.53 ns | 0.289 ns | 0.270 ns |
+ // | Exp        | 453.79 ns | 3.111 ns | 2.758 ns |
+ //       [Benchmark] public Span<float> ExpAvxFast() => MathEx.ExpFast(a);
+ //       [Benchmark] public Span<float> Exp() => MathEx.Exp(a);
+
+
+
 
     }
 }

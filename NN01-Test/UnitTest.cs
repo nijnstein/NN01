@@ -53,5 +53,16 @@ namespace UnitTests
             float f = MathEx.Sum(a);
             Assert.IsTrue(f == b, $"mathex {f} != {b}");
         }
+
+        [TestCase(new float[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 })]
+        public void Intrinsics_Exp(float[] a)
+        {
+            float f = MathF.Exp(a[0]); 
+            Intrinsics.Exp(a);
+            
+            Assert.IsTrue(a[0] >= f - 0.00001f && a[0] <= f + 0.0001f , $"intrinsics.exp {a[0]} != {f}");
+        }
+
+
     }
 }

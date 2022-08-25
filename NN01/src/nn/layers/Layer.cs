@@ -222,28 +222,32 @@ namespace NN01
                     Vector256<float> gw = Vector256.Create(gamma[i] * weightLearningRate);
                     Span<Vector256<float>> w = MemoryMarshal.Cast<float, Vector256<float>>(Weights[i]);
 
-                    int jj = 0; 
-                    while (j < (previous.Size & ~7))
+                    int jj = 0;
+                    unchecked
                     {
-                        Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(WeightDeltas![i]);
+                        while (j < (previous.Size & ~7))
+                        {
+                            Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(WeightDeltas![i]);
 
-                        Vector256<float> d = Avx.Multiply(prev[jj], gw);
-                        w[jj] =
-                            Avx.Subtract(w[jj], 
-                            // delta 
-                            Avx.Add(
-                                Avx.Add(d,Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
-                                // strengthen learned weights
-                                Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost,w[jj])))
-                            ));
+                            Vector256<float> d = Avx.Multiply(prev[jj], gw);
+                            w[jj] =
+                                Avx.Subtract(w[jj],
+                                // delta 
+                                Avx.Add(
+                                    Avx.Add(d, Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
+                                    // strengthen learned weights
+                                    Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost, w[jj])))
+                                ));
 
-                        wDelta[jj] = d;
-                        j += 8;
-                        jj++;
+                            wDelta[jj] = d;
+                            j += 8;
+                            jj++;
+                        }
                     }
                 }
                 unchecked
                 {
+                    // calc the rest with scalar math
                     while (j < previous.Size)
                     {
                         float delta = previous.Neurons[j] * gamma[i] * weightLearningRate;

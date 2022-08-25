@@ -72,5 +72,7 @@ namespace NN01
         {
             return x < 0 ? 0 : 1;
         }
+
+
     }
 }
