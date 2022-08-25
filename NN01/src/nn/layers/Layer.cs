@@ -160,27 +160,35 @@ namespace NN01
                 InitializeDeltaBuffers();
             }
 
+            Span<float> weightDelta = stackalloc float[previous.Size];
+            Span<float> weightMomentum = stackalloc float[previous.Size];
+
+            Span<float> biasDelta = stackalloc float[Size];
+            Span<float> biasMomentum = stackalloc float[Size];
+
+            Intrinsics.MultiplyScalar(gamma, biasLearningRate, biasDelta);
+            Intrinsics.MultiplyScalar(BiasDeltas!, momentum, biasMomentum);
+
             // calculate new weights and biases for the last layer in the network 
             for (int i = 0; i < Size; i++)
             {
-                float delta = gamma[i] * biasLearningRate;
-
-                Biases[i] -= delta + (momentum * BiasDeltas![i]);
-                BiasDeltas[i] = delta; 
+                Biases[i] -= biasDelta[i] + biasMomentum[i];
+                BiasDeltas![i] = biasDelta[i];   // intrinsics.Move()
 
                 // apply some learning... move in direction of result using gamma 
+
+                Intrinsics.MultiplyScalar(previous.Neurons, gamma[i] * weightLearningRate, weightDelta);
+                Intrinsics.MultiplyScalar(WeightDeltas![i], momentum, weightMomentum);
+
                 for (int j = 0; j < previous.Size; j++)
                 {
-                    delta = gamma[i] * previous.Neurons[j] * weightLearningRate; 
-
-                    Weights[i][j] -= 
-                        delta 
-                        // hold momentum 
-                        + (momentum * WeightDeltas![i][j]) 
+                    Weights[i][j] -=
+                        // delta 
+                        weightDelta[j] + weightMomentum[j]
                         // strengthen learned weights
                         + (weightLearningRate * (gamma[i] - weightCost * Weights[i][j]));
 
-                    WeightDeltas[i][j] = delta; 
+                    WeightDeltas[i][j] = weightDelta[j]; 
                 }
             }
         }

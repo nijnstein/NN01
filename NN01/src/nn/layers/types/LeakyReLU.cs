@@ -26,24 +26,12 @@ namespace NN01
 
             for (int j = 0; j < Size; j++)
             {
-                // multiply weight with input neuron 
-                for (int k = 0; k < previous.Size; k++)
-                {
-                    values[k] = Weights[j][k] * previous.Neurons[k];
-                }
+                // compute sum of weights multiplied with input neurons then add bias
+                float value = Intrinsics.Sum(Intrinsics.Multiply(Weights[j], previous.Neurons, values)) + Biases[j];
 
-                // column sum
-                float value = 0f;
-                for (int k = 0; k < previous.Size; k++)
-                {
-                    value += values[k];
-                }
-
-                // apply bias
-                value += Biases[j];
-                      
                 // leaky relu 
-                Neurons[j] = value < 0 ? MathF.Exp(value) - 1 : value;
+                //    Neurons[j] = value < 0 ? MathF.Exp(value) - 1 : value;
+                Neurons[j] = value < 0 ? 0.01f : value;
             }
         }
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)

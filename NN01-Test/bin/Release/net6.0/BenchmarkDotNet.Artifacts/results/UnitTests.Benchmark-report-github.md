@@ -10,5 +10,6 @@ Intel Core i9-9900K CPU 3.60GHz (Coffee Lake), 1 CPU, 16 logical and 8 physical 
 ```
 |    Method |      Mean |    Error |   StdDev |
 |---------- |----------:|---------:|---------:|
-|    MaxAVX |  12.42 ns | 0.184 ns | 0.172 ns |
-| MaxDotnet | 514.38 ns | 4.360 ns | 3.865 ns |
+|    SumAvx |  14.43 ns | 0.179 ns | 0.167 ns |
+|   SumFast |  76.11 ns | 1.510 ns | 1.551 ns |
+| SumDotnet | 458.25 ns | 5.504 ns | 5.149 ns |

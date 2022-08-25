@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -202,7 +203,7 @@ namespace NN01
             {
                 // precalculate delta 
                 delta[i] = Output.Neurons[i] - expected[i];
-
+                                        
                 // calculate cost of network 
                 Cost += (float)Math.Pow(delta[i], 2);
             }

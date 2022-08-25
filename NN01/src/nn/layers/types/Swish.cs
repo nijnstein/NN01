@@ -23,16 +23,12 @@ namespace NN01
 
         public override void Activate(Layer previous)
         {
+            Span<float> values = stackalloc float[previous.Size];
+            
             for (int j = 0; j < Size; j++)
             {
-                // weighted sum of (w[j][k] * n[i][k])
-                float value = 0f;
-                for (int k = 0; k < previous.Size; k++)
-                {
-                    value += Weights[j][k] * previous.Neurons[k];
-                }
-
-                value += Biases[j];
+                // compute sum of weights multiplied with input neurons then add bias
+                float value = Intrinsics.Sum(Intrinsics.Multiply(Weights[j], previous.Neurons, values)) + Biases[j];
 
                 Neurons[j] = value.Swish();
             }
