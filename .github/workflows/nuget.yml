@@ -8,8 +8,9 @@ jobs:
     name: build pack & publish
     runs-on: windows
     steps: 
-      - uses: action/checkout@v2
-      - name: publish  
+      - name: Checkout
+        uses: action/checkout@v2
+      - name: Publish  
         uses: brandedoutcast/publish-nuget@v2.5.5
         with:
           PROJECT_FILE_PATH: NN01/NN01.csproj
