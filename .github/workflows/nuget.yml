@@ -1,4 +1,4 @@
-name: Publish NuGet
+name: Publish to NuGet
 on:
   push:
     branches:
@@ -21,6 +21,6 @@ jobs:
           #TAG_COMMIT: # optional, default is true
 
           #TAG_FORMAT: # optional, default is v*
-          #NUGET_KEY:
+          NUGET_KEY: oy2faarw2prqjlnrquxazmdpyttvty7ezjvnfikaa4t2di
           #NUGET_SOURCE:
           
