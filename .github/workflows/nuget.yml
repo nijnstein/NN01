@@ -1,0 +1,14 @@
+- name: Publish NuGet
+  uses: brandedoutcast/publish-nuget@v2.5.5
+  with:
+    PROJECT_FILE_PATH: github.com/nijnstein/NN01
+    PACKAGE_NAME: # optional
+    VERSION_FILE_PATH: # optional
+    VERSION_REGEX: # optional, default is ^\s*<Version>(.*)<\/Version>\s*$
+    VERSION_STATIC: # optional
+    TAG_COMMIT: # optional, default is true
+
+    TAG_FORMAT: # optional, default is v*
+    NUGET_KEY:
+    NUGET_SOURCE:
+    INCLUDE_SYMBOLS: true
