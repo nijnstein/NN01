@@ -269,6 +269,47 @@ namespace NN01
             }
         }
 
+        static float[] FeedForward(Span<NetworkBuffers<float>> layerData, Span<float> sample)
+        {
+            Debug.Assert(sample.Length == layerData[0].Neurons.Length, "sample size does not match input size");
+
+            // copy input neurons into layerdata 
+            Span<float> input = layerData[0].Neurons.Span;
+
+            for (int i = 0; i < sample.Length; i++)
+            {
+                input[i] = sample[i];
+            }
+
+            // propagate state through layers 
+            for (int i = 1; i < layers.Length; i++)
+            {
+                // activate neurons in current layer from state of previous layer 
+                layers[i].Activate(layers[i - 1]);
+            }
+
+            // return the output neuron state 
+            return Output.Neurons;
+        }
+
+        static float[] FeedForward(Span<GPUNetworkBuffers<float>> layerData, Span<float> sample, Accelerator acc)
+        {
+            Debug.Assert(sample.Length == layerData[0].Neurons.Length, "sample size does not match input size");
+
+            // copy input neurons to GPU into layerdata 
+            layerData[0].Neurons.View.CopyFromCPU(acc.DefaultStream, sample); 
+                           
+            // propagate state through layers 
+            for (int i = 1; i < layers.Length; i++)
+            {
+                // activate neurons in current layer from state of previous layer 
+                layers[i].Activate(layers[i - 1]);
+            }
+
+            // return the output neuron state 
+            return Output.Neurons;
+        }
+
         public void Train( )
         {
             Debug.Assert(buffers != null, "internal buffer not initialized"); 
