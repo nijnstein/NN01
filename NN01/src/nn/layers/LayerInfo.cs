@@ -27,7 +27,6 @@ namespace NN01
         public Distribution WeightInitializer = Distribution.Random;
         public Distribution BiasInitializer = Distribution.Random;
 
-
         public bool IsInput => LayerIndex == 0 && LayerCount > 0; 
         public bool IsOutput => LayerIndex == LayerCount - 1; 
 
@@ -42,6 +41,10 @@ namespace NN01
         public LayerInfo()
         {
         }
+
+        /// <summary>
+        /// calculate total buffersize including any needed alignment
+        /// </summary>
         public int CalculateLayerBufferSize(LayerInfo next = default)
         {
             if (IsOutput)
@@ -54,8 +57,8 @@ namespace NN01
             {
                 int s256 = Size.Align256(); 
                 return
-                    // neurons + backward activation probs + gamma 
-                    (Size.Align256() * 3) +
+                    // neurons + gamma   //// not added:  backward activation probs
+                    (Size.Align256() * 2) +
                     // weights + bias 
                     (Size * next.Size).Align256() * 2 + next.Size.Align256() * 2; 
             }
@@ -64,8 +67,6 @@ namespace NN01
         /// <summary>
         /// enumerates unaligned sizes of individual buffers for this layer 
         /// </summary>
-        /// <param name="next"></param>
-        /// <returns></returns>
         public IEnumerable<int> EnumerateBufferSizes(LayerInfo next = default)
         {
             if (IsOutput)

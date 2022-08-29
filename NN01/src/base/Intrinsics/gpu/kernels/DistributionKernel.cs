@@ -16,8 +16,6 @@ using System.Threading.Tasks;
 
 namespace NN01 
 {
-
-
     public static class DistributionKernel
     {
         public static Action<Index1D, ArrayView<float>, float, float> GetGPU(Distribution distribution)
@@ -74,10 +72,9 @@ namespace NN01
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void NormalGPUKernel(Index1D index, ArrayView<float> data, float mean, float sd)
         {
-           // data[index] = (data[index] - 0.5f) * 2 * sd + mean;
             float x = data[index];   
-            double p = 1 / Math.Sqrt(2f * MathF.PI * (sd * sd));
-            data[index] = (float)(p * Math.Exp(-0.5 * ((x - mean) * (x - mean)) / (sd * sd)));
+            float p = 1f / MathF.Sqrt(2f * MathF.PI * (sd * sd));
+            data[index] = (p * MathF.Exp(-0.5f * ((x - mean) * (x - mean)) / (sd * sd)));
         }
         
         [Pure]

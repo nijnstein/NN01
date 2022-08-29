@@ -48,7 +48,7 @@ namespace UnitTests
 
                     Console.WriteLine("");
                     Console.WriteLine("");
-
+               
                     try
                     {
                         new Pattern64_ocr_gpu().Run(20, true);

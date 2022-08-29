@@ -130,13 +130,6 @@ namespace NN01
             Layers = info;
 
             int[] bufferSizes = Layers.SelectMany(x => x.EnumerateBufferSizes( x.LayerIndex < x.LayerCount - 1 ? Layers[x.LayerIndex + 1] : default)).ToArray();
-            int totalBufferSize = 0; 
-
-            for (int i = 0; i < Layers.Length; i++)
-            {
-                totalBufferSize += Layers[i].CalculateLayerBufferSize(i < Layers.Length - 1 ? Layers[i + 1] : default);
-            }
-
             buffers = new Buffers<float>(bufferSizes, true); 
         }
 
@@ -193,6 +186,15 @@ namespace NN01
 #endif 
         }
 
+        public int CalculateLayerDataSize()
+        {
+            int totalBufferSize = 0;
+            for (int i = 0; i < Layers.Length; i++)
+            {
+                totalBufferSize += Layers[i].CalculateLayerBufferSize(i < Layers.Length - 1 ? Layers[i + 1] : default);
+            }
+            return totalBufferSize;
+        }
         private Span<NetworkBuffers<float>> GetLayerData(IBufferLease<float> lease) => Layers.Select(x => lease.GetLayerData(lease, x)).ToArray().AsSpan();
         private Span<GPUNetworkBuffers<float>> GetGPULayerData(IBufferLease<float> lease, Accelerator acc) => Layers.Select(x => lease.GetGPULayerData(lease, x, acc)).ToArray().AsSpan();
 
