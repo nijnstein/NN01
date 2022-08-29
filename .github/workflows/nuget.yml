@@ -1,0 +1,29 @@
+name: Publish to NuGet
+
+on:
+  push:
+    branches:
+      - main
+
+jobs: 
+  publish:
+    name: build pack & publish
+    runs-on: windows
+    steps: 
+      - name: Checkout
+        uses: action/checkout@v2
+      - name: Publish  
+        uses: brandedoutcast/publish-nuget@v2.5.5
+        with:
+          PROJECT_FILE_PATH: NN01/NN01.csproj
+          PACKAGE_NAME: NN01
+          INCLUDE_SYMBOLS: true
+          #VERSION_FILE_PATH: # optional
+          #VERSION_REGEX: # optional, default is ^\s*<Version>(.*)<\/Version>\s*$
+          #VERSION_STATIC: # optional
+          #TAG_COMMIT: # optional, default is true
+
+          #TAG_FORMAT: # optional, default is v*
+          NUGET_KEY: oy2faarw2prqjlnrquxazmdpyttvty7ezjvnfikaa4t2di
+          #NUGET_SOURCE:
+          
