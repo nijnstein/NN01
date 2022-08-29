@@ -30,24 +30,24 @@ namespace UnitTests
             {
                 do
                 {
-                    new LogicGate4Way().Run();
-                    Console.WriteLine("");
-                    Console.WriteLine("");
-
-                    new Pattern64().Run();
-
-                    Console.WriteLine("");
-                    Console.WriteLine("");
-
-                    new Pattern64_multiclass().Run();
-
-                    Console.WriteLine("");
-                    Console.WriteLine("");
-
-                    new Pattern64_ocr().Run(100);
-
-                    Console.WriteLine("");
-                    Console.WriteLine("");
+                //    new LogicGate4Way().Run();
+                //    Console.WriteLine("");
+                //    Console.WriteLine("");
+                //
+                //    new Pattern64().Run();
+                //
+                //    Console.WriteLine("");
+                //    Console.WriteLine("");
+                //
+                //    new Pattern64_multiclass().Run();
+                //
+                //    Console.WriteLine("");
+                //    Console.WriteLine("");
+                //
+                //    new Pattern64_ocr().Run(100);
+                //
+                //    Console.WriteLine("");
+                //    Console.WriteLine("");
                
                     try
                     {
