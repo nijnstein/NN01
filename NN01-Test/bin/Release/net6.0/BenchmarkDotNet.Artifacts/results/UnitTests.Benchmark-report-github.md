@@ -10,9 +10,5 @@ Intel Core i9-9900K CPU 3.60GHz (Coffee Lake), 1 CPU, 16 logical and 8 physical 
 ```
 |                                    Method |         Mean |      Error |     StdDev |
 |------------------------------------------ |-------------:|-----------:|-----------:|
-| AlignedBuffer_SumAvxAlignedBufferedSingle |     42.50 ns |   0.516 ns |   0.483 ns |
-|  AlignedBuffer_SumAvxAlignedBufferedx1000 |     43.87 ns |   0.374 ns |   0.312 ns |
-|   AlignedBuffer_SumAvxAlignedPooledSingle |    133.62 ns |   2.707 ns |   3.222 ns |
-|    AlignedBuffer_SumAvxAlignedPooledx1000 | 15,199.53 ns | 130.972 ns | 122.512 ns |
-|     AlignedBuffer_SumAvxAlignedHeapSingle |    114.64 ns |   1.700 ns |   1.590 ns |
-|      AlignedBuffer_SumAvxAlignedHeapx1000 | 14,985.62 ns | 102.463 ns |  90.830 ns |
+| AlignedBuffer_SumAvxAlignedBufferedSingle |     75.13 ns |   1.222 ns |   1.083 ns |
+|  AlignedBuffer_SumAvxAlignedBufferedx1000 | 14,638.42 ns | 292.046 ns | 299.909 ns |

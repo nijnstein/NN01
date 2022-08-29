@@ -39,9 +39,32 @@ namespace UnitTests
                     Console.WriteLine("");
                     Console.WriteLine("");
 
+                    new Pattern64_multiclass().Run();
+
+                    Console.WriteLine("");
+                    Console.WriteLine("");
+
+                    new Pattern64_ocr().Run(100);
+
+                    Console.WriteLine("");
+                    Console.WriteLine("");
+
+                    try
+                    {
+                        new Pattern64_ocr_gpu().Run(20, true);
+                    }
+                    catch(Exception ex)
+                    {
+                        Console.WriteLine(ex.ToString()); 
+                    }
+
+                    Console.WriteLine("");
+                    Console.WriteLine("");
+
                     Console.WriteLine("[SPACEBAR] to run tests again, any other to exit");
                     Console.WriteLine("");
                     Console.WriteLine("");
+
                 }
                 while (Console.ReadKey().Key == ConsoleKey.Spacebar);
             }

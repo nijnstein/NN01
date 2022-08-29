@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -71,11 +72,16 @@ namespace NN01
             public float ReadyTestSlice { get; set; } = 0.05f;
 
             /// <summary>
+            /// if enabled uses the power of the gpu 
+            /// </summary>                           
+            public bool GPU { get; set; } = false;
+
+            /// <summary>
             /// a default ready estimation: stop training if fitness or cost reaches some threshold 
             /// </summary>
-            public Func<float, float, bool> ReadyEstimator { get; set; } = (cost, fitness) =>
+            public Func<NeuralNetwork, bool> ReadyEstimator { get; set; } = (nn) =>
             {
-                return fitness > 0.999f && (cost < 0.005f);
+                return (nn.Cost > 0 && nn.CostDelta < 0.000001) || (nn.Fitness > 0.99f && nn.Cost < 0.005f);
             };
 
             /// <summary>
@@ -83,21 +89,21 @@ namespace NN01
             /// </summary>
             public Func<NeuralNetwork, float[][], float[][], float> FitnessEstimator { get; set; } = (network, patterns, labels) =>
             {
-                float fittness = 0;
-                int c = 0;
-                for (int k = 0; k < labels.Length; k++)
+                Debug.Assert(labels.Length > 0); 
+                if (labels.Length > 0)
                 {
-                    float[] output = network.FeedForward(patterns[k]);
-                    float[] label = labels[k];
-
-                    for (int l = 0; l < output.Length; l++)
+                    float fittness = 0;
+                    int c = 0;
+                    for (int k = 0; k < labels.Length; k++)
                     {
-                        float d = label[l] - output[l];
-                        fittness += d * d;
-                        c++;
+                        float[] output = network.FeedForward(patterns[k]);
+                        float[] label = labels[k];
+
+                        fittness += Intrinsics.SumSquaredDifferences(label, output);
                     }
+                    return 1f - Math.Max(0f, Math.Min(1f, fittness / (labels.Length * labels[0].Length)));
                 }
-                return 1f - Math.Max(0f, Math.Min(1f, fittness / c));
+                return float.NaN; 
             };
 
             /// <summary>

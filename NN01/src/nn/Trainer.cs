@@ -1,5 +1,8 @@
-﻿using System;
+﻿using ILGPU.Runtime;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,6 +11,8 @@ namespace NN01
 {
     public partial class Trainer
     {
+        public GPUContext? GPUContext;
+
         public NeuralNetwork? Network;
         public List<NeuralNetwork>? Networks;
         public Settings? settings;
@@ -15,7 +20,6 @@ namespace NN01
         private int istep;
         private float currentMomentum;
         private float currentWeightCost;
-
 
         public void Reset(NeuralNetwork network, IEnumerable<NeuralNetwork> others, Settings settings = null!)
         {
@@ -54,45 +58,70 @@ namespace NN01
 
             Func<NeuralNetwork, float[][], float[][], float> fitnessEstimator = null!)
         {
+            Step(
+                patterns, MathEx.Variance(patterns, MathEx.Average(patterns)), labels,
+                testPatterns, testLabels, 
+                fitnessEstimator);
+        }
+
+        public void Step(
+            float[][] patterns, float variance,
+            float[][] labels,
+
+            float[][] testPatterns,
+            float[][] testLabels,
+
+            Func<NeuralNetwork, float[][], float[][], float> fitnessEstimator = null!)
+        {
             if (settings == null || Network == null || Networks == null || patterns == null || labels == null)
             {
-                throw new ArgumentNullException(); 
+                throw new ArgumentNullException();
             }
             if (fitnessEstimator == null) fitnessEstimator = settings!.FitnessEstimator;
-            if(testPatterns == null)
+            if (testPatterns == null)
             {
                 testPatterns = patterns;
-                testLabels = labels; 
+                testLabels = labels;
             }
-        
-            // train 1 step
-            Parallel.For(0, settings.Population, (j) =>
-            {
-                // setup buffers
-                float[][] gamma = new float[Network.LayerCount][];
-                for (int i = 0; i < Network.LayerCount; i++)
-                {
-                    gamma[i] = new float[Network[i].Size];
-                }
 
-                // mutate population if:
-                // - not on the first step 
-                // - located in bad half 
-                if (istep > 0 && j < settings.Population / 2)
+     
+                // train 1 step
+                Parallel.For(0, settings.Population, (j) =>
                 {
-                    Networks[j + settings.Population / 2].DeepClone(Networks[j]);
-                    Networks[j].Mutate((int)(1 / settings.MutationChance), settings.MutationStrength);
-                }
+                    Accelerator? acc = GPUContext != null ? GPUContext.CreateAccelerator() : null;
 
-                // back propagate population 
-                for (int k = 0; k < labels.Length; k++)
-                {
-                    Networks[j].BackPropagate(patterns[k], labels[k], gamma, settings.LearningRate, settings.LearningRate, currentMomentum);
-                }
+                    // init gamma buffer foreach network if needed 
+                    if (Networks[j].Gamma == null)
+                    {
+                        float[][] gamma = new float[Networks[j].LayerCount][];
+                        for (int i = 0; i < Networks[j].LayerCount; i++)
+                        {
+                            gamma[i] = new float[Networks[j][i].Size];
+                        }
+                        Networks[j].Gamma = gamma;
+                    }
 
-                // recalculate fittness 
-                Networks[j].Fitness = fitnessEstimator(Networks[j], patterns, labels) * fitnessEstimator(Networks[j], testPatterns, testLabels);
-            });
+                    // mutate population if:
+                    // - not on the first step 
+                    // - located in bad half 
+                    if (istep > 0 && j < settings.Population / 2)
+                    {
+                        Networks[j + settings.Population / 2].DeepClone(Networks[j]);
+                        Networks[j].Mutate((int)(1 / settings.MutationChance), settings.MutationStrength);
+                    }
+
+                    // back propagate population 
+                    for (int k = 0; k < labels.Length; k++)
+                    {
+                        Networks[j].BackPropagate(patterns[k], labels[k], Networks[j].Gamma, settings.LearningRate, settings.LearningRate, currentMomentum);
+                    }
+
+                    // recalculate fittness 
+                    Networks[j].Fitness = fitnessEstimator(Networks[j], patterns, labels) * fitnessEstimator(Networks[j], testPatterns, testLabels);
+
+                    if (acc != null) acc.Dispose();
+                });
+            
 
             // sort on fitness condition
             Networks.Sort();
@@ -113,8 +142,10 @@ namespace NN01
             Networks[settings.Population - 1].DeepClone(Network);
         }
 
-        public bool EstimateIfReady(Func<float, float, bool> readyEstimator = null)
+        public bool EstimateIfReady(Func<NeuralNetwork, bool>? readyEstimator = null)
         {
+            Debug.Assert(settings != null);
+            Debug.Assert(Network != null);
             if (readyEstimator == null)
             {
                 readyEstimator = settings.ReadyEstimator; 
@@ -123,6 +154,7 @@ namespace NN01
         }
 
 
+        #region Older static code, still used in first tests.. todo: refactor that away 
         public static int Train(
             NeuralNetwork network,
 
@@ -133,7 +165,7 @@ namespace NN01
             float[][] testLabels,
 
             Func<NeuralNetwork, float[][], float[][], float> fitnessEstimator,
-            Func<float, float, bool> readyEstimator,
+            Func<NeuralNetwork, bool> readyEstimator,
             
             Settings settings = null!)
         {
@@ -156,8 +188,13 @@ namespace NN01
             for (; istep < settings.Steps; istep++)
             {
                 // train 1 step
+#if DEBUG
+                for (int j = 0; j < settings.Population; j++)
+                {
+#else
                 Parallel.For(0, settings.Population, (j) =>
                 {
+#endif
                     // setup buffers
                     float[][] gamma = new float[network.LayerCount][];
                     for (int i = 0; i < network.LayerCount; i++)
@@ -173,16 +210,20 @@ namespace NN01
                         networks[j + settings.Population / 2].DeepClone(networks[j]);
                         networks[j].Mutate((int)(1 / settings.MutationChance), settings.MutationStrength);
                     }
-                    
+
                     // back propagate population 
                     for (int k = 0; k < labels.Length; k++)
                     {
-                        networks[j].BackPropagate(patterns[k], labels[k], gamma, settings.LearningRate, settings.LearningRate, currentMomentum);
+                        networks[j].BackPropagate(patterns[k], labels[k], gamma, settings.LearningRate, settings.LearningRate, currentMomentum, 1E-05f, 1E-07F);
                     }
-                    
+
                     // recalculate fittness 
                     networks[j].Fitness = fitnessEstimator(networks[j], patterns, labels) * fitnessEstimator(networks[j], testPatterns, testLabels);
+#if DEBUG
+                }
+#else
                 });                
+#endif 
 
                 // sort on fitness condition
                 networks.Sort();
@@ -218,13 +259,13 @@ namespace NN01
             return istep;
         }
 
-        public static bool EstimateIfReady(NeuralNetwork network, Func<float, float, bool> readyEstimator, Settings settings, List<NeuralNetwork> networks)
+        public static bool EstimateIfReady(NeuralNetwork network, Func<NeuralNetwork, bool> readyEstimator, Settings settings, List<NeuralNetwork> networks)
         {
             for (int j = settings.Population - 1;
                     j >= (int)Math.Max(settings.Population - (settings.Population * settings.ReadyTestSlice), 0f);
                     j--)
             {
-                if (readyEstimator(networks[j].Cost, networks[j].Fitness))
+                if (readyEstimator(networks[j]))
                 {
                     // clone best mutation into source network 
                     networks[j].DeepClone(network);
@@ -235,7 +276,6 @@ namespace NN01
             return false; 
         }
 
-        #region Train Overloads 
         public static int Train(NeuralNetwork network, float[][] patterns, int[] classes, float[][] testPatterns, int[] testClasses, Settings settings = null)
         {
             float[][] CreateOutputLabels(int classCount, int[] classes)
@@ -270,20 +310,16 @@ namespace NN01
         {
             settings = settings == null ? Settings.Default : settings;
 
-            settings.ReadyEstimator = (cost, fitness) =>
+            settings.ReadyEstimator = (nn) =>
             {
-                return fitness > readyAt && 1 - cost > readyAt;
-            }; 
+                return nn.CostDelta < 0.0001 || (nn.Fitness > readyAt && nn.Cost < nn.Cost - readyAt);
+            };
 
             return Train(network, patterns, classes, testPatterns, testClasses, settings);
         }
 
-        public static int Train(NeuralNetwork network, float[][] patterns, int[] classes, float readyAt = 0.9999f, Settings settings = null)
-        {
-            return Train(network, patterns, classes, patterns, classes, readyAt, settings);
-        }
-
-        #endregion 
+    
+        #endregion
 
     }
 }

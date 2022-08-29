@@ -1,5 +1,7 @@
-﻿using System;
+﻿using ILGPU.Runtime;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,13 +11,13 @@ namespace NN01
     public class SigmoidLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Sigmoid;
-        public SigmoidLayer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Default, LayerInitializer biasInit = LayerInitializer.Default, bool skipInit = false)
+        public SigmoidLayer(int size, int previousSize, Distribution weightInit = Distribution.Default, Distribution biasInit = Distribution.Default, bool skipInit = false)
             : base
             (
                   size,
                   previousSize,
-                  weightInit == LayerInitializer.Default ? LayerInitializer.Normal : weightInit,
-                  biasInit == LayerInitializer.Default ? LayerInitializer.Random : biasInit,
+                  weightInit == Distribution.Default ? Distribution.Normal : weightInit,
+                  biasInit == Distribution.Default ? Distribution.Random : biasInit,
                   skipInit
             )
         {
@@ -39,6 +41,19 @@ namespace NN01
                 Neurons[j] = f / (1.0f + f);
             }
         }
+
+        public override void Derivate(Span<float> output)
+        {
+            Debug.Assert(output != null);
+            Debug.Assert(output.Length == this.Neurons.Length);
+
+            for (int j = 0; j < Size; j++)
+            {
+                output[j] = ActivationFunctions.SigmoidDerivative(Neurons[j]);
+            }
+        }
+
+
         public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
         {
             // gamma == difference times  activationDerivative(neuron value)

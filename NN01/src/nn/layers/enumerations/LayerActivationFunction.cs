@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace NN01 
 {
-    public enum LayerActivationFunction
+    public enum LayerActivationFunction : byte
     {
         Sigmoid,
 

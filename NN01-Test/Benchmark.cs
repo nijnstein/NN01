@@ -5,7 +5,7 @@ using System.Buffers;
 
 namespace UnitTests
 {
-    
+
     public class Benchmark
     {
         static public float[] a = new float[]

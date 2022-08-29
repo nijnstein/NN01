@@ -13,7 +13,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NN01
+namespace NN01 
 {
     /// <summary>
     /// an array, aligned for SSE/AVX operations.
@@ -21,7 +21,7 @@ namespace NN01
     /// - NOT ENTIRELY SAFE - 
     /// 
     /// </summary>
-    public sealed class AlignedBuffer<T> : IDisposable where T: unmanaged 
+    public sealed class AlignedBuffer<T> : IDisposable where T : unmanaged
     {
         public static readonly Action<object, Action<IntPtr>> GetPinnedPtr;
 
@@ -69,7 +69,7 @@ namespace NN01
         /// <summary>
         /// size of elements in bytes (sizeof(T))
         /// </summary>
-        public int ElementSize => _sizeOfT; 
+        public int ElementSize => _sizeOfT;
         public bool IsPooled { get; private set; }
         public bool IsOwned { get; private set; }
 
@@ -79,11 +79,11 @@ namespace NN01
         public AlignedBuffer(int size, int alignment, bool pooled = true)
         {
             T t = default;
-            _sizeOfT = Marshal.SizeOf<T>(t); 
+            _sizeOfT = Marshal.SizeOf(t);
             Debug.Assert(0 < size);
             Debug.Assert(_sizeOfT <= alignment);
-            Debug.Assert((alignment & (alignment - 1)) == 0);
-            Debug.Assert((size * _sizeOfT) % alignment == 0);
+            Debug.Assert((alignment & alignment - 1) == 0);
+            Debug.Assert(size * _sizeOfT % alignment == 0);
 
             if (pooled)
             {
@@ -91,7 +91,7 @@ namespace NN01
             }
             else
             {
-                items = new T[size + alignment / _sizeOfT]; 
+                items = new T[size + alignment / _sizeOfT];
             }
 
             Size = size;
@@ -103,20 +103,20 @@ namespace NN01
             _base = 0;
         }
 
-        private T refT; 
+        private T refT;
 
         public AlignedBuffer(T[] data, int size, int alignment)
         {
             T t = default;
-            _sizeOfT = Marshal.SizeOf<T>(t);
- 
+            _sizeOfT = Marshal.SizeOf(t);
+
             Debug.Assert(0 < size);
             Debug.Assert(_sizeOfT <= alignment);
-            Debug.Assert((alignment & (alignment - 1)) == 0);
-            Debug.Assert((size * _sizeOfT) % alignment == 0);
+            Debug.Assert((alignment & alignment - 1) == 0);
+            Debug.Assert(size * _sizeOfT % alignment == 0);
             Debug.Assert(size + alignment / _sizeOfT <= data.Length);
 
-            items = data; 
+            items = data;
             Size = size;
             Alignment = alignment;
             IsLeased = false;
@@ -138,7 +138,7 @@ namespace NN01
             }
         }
 
-        private int GetBase(long addr)
+        private int GetBase(long addr, bool copyDataOnRebase = true)
         {
             Debug.Assert(IsLeased);
 
@@ -148,7 +148,7 @@ namespace NN01
 //                Debug.Assert((float*)addr == p);
 //            }
 #endif
-            int low = (int)(addr & (Alignment - 1));
+            int low = (int)(addr & Alignment - 1);
             int min = low == 0 ? 0 : Alignment - low;
 
             Debug.Assert(min % _sizeOfT == 0);
@@ -157,6 +157,29 @@ namespace NN01
             if (index == _base)
             {
                 return _base;
+            }
+
+            if (copyDataOnRebase)
+            {
+                //
+                // unfortunately we need to copy this data because the garbage collector moved us
+                //
+                Debug.Print($"AlignedBuffer: moving {Size} elements from base {_base} to {index}"); 
+                if (index < _base)
+                {
+                    // moved back => copy forward 
+                    for (int i = 0; i < Size; i++)
+                    {
+                        items[index + i] = items[_base + i];
+                    }
+                }
+                else
+                {
+                    for (int i = Size - 1; i >= 0; i--)
+                    {
+                        items[index + i] = items[_base + i];
+                    }
+                }
             }
 
             _base = index;
@@ -184,6 +207,15 @@ namespace NN01
             /// get a span over the buffer, the buffer may be garbage initialized
             /// </summary>
             public Span<T> GetSpan(int from, int _length) => items.AsSpan(@base + from, _length);
+
+            /// <summary>
+            /// get a span over the buffer, the buffer may be garbage initialized
+            /// </summary>
+            public Span<T> GetSpan(long from, long _length) => items.AsSpan((int)(@base + from),(int) _length);
+
+            public Memory<T> GetMemory(long from, long _length) => items.AsMemory((int)(@base + from), (int)_length);
+
+            public Memory<T> GetMemory(int from, int _length) => items.AsMemory(@base + from, _length);
         }
 
         /// <summary>
@@ -195,9 +227,9 @@ namespace NN01
         {
             GetPinnedPtr(
                 items,
-                (Action<IntPtr>)((ptr) =>
+                (ptr) =>
                     {
-                        Debug.Assert(!IsLeased, "AlignedBuffer already in use");
+                        Debug.Assert(!IsLeased, "AlignedBuffer already leased!");
                         IsLeased = true;
                         try
                         {
@@ -207,7 +239,7 @@ namespace NN01
                         {
                             IsLeased = false;
                         }
-                    })
+                    }
             );
         }
     }

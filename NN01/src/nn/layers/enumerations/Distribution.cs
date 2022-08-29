@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace NN01 
 {                 
-    public enum LayerInitializer
+    public enum Distribution : byte
     {
         /// <summary>
         /// default to activation default
@@ -42,6 +42,6 @@ namespace NN01
         /// == Xavier 
         /// </summary>
         // Glorot 
-
+    
     }
 }

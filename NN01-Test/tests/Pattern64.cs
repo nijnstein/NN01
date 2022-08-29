@@ -45,9 +45,9 @@ namespace UnitTests
             Trainer.Settings settings = new Trainer.Settings();
             settings.Population = 100;
             settings.Steps = 1000; 
-            settings.ReadyEstimator = (cost, fitness) =>
+            settings.ReadyEstimator = (nn) =>
             {
-                return fitness > 0.99f && (cost < 0.01f);
+                return nn.Fitness > 0.99f && (nn.Cost < 0.01f);
             };
 
             Console.WriteLine($"Training network");

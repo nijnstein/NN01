@@ -1,5 +1,8 @@
-﻿using System;
+﻿using ILGPU;
+using ILGPU.Runtime;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
@@ -26,11 +29,16 @@ namespace NN01
         public bool IsInput => PreviousSize == 0;
 
         public abstract LayerActivationFunction ActivationType { get; }
+        //
+        //
+        //      Full - single  (later convolutions)  
+        //
+        //
+        public LayerConnectedness Connectedness { get; set; } = LayerConnectedness.Full;
+        public Distribution WeightInitializer { get; set; } = Distribution.Random;
+        public Distribution BiasInitializer { get; set; } = Distribution.Random;
 
-        public LayerInitializer WeightInitializer { get; set; } = LayerInitializer.Random;
-        public LayerInitializer BiasInitializer { get; set; } = LayerInitializer.Random;
-
-        public Layer(int size, int previousSize, LayerInitializer weightInit = LayerInitializer.Random, LayerInitializer biasInit = LayerInitializer.Random, bool skipInit = true)
+        public Layer(int size, int previousSize, Distribution weightInit = Distribution.Random, Distribution biasInit = Distribution.Random, bool skipInit = true)
         {
             Size = size;
             PreviousSize = previousSize;
@@ -68,16 +76,17 @@ namespace NN01
 
         public abstract void Activate(Layer previous);
         public abstract void CalculateGamma(float[] delta, float[] gamma, float[] target);
+        public abstract void Derivate(Span<float> output);
 
-        private void InitializeDistribution(LayerInitializer initializer, float[] data)
+        private void InitializeDistribution(Distribution initializer, float[] data)
         {
             switch (initializer)
             {
-                case LayerInitializer.Zeros: for (int i = 0; i < data.Length; i++) data[i] = 0; break;
-                case LayerInitializer.Ones: for (int i = 0; i < data.Length; i++) data[i] = 1; break;
-                
+                case Distribution.Zeros: for (int i = 0; i < data.Length; i++) data[i] = 0; break;
+                case Distribution.Ones: for (int i = 0; i < data.Length; i++) data[i] = 1; break;
+
                 default:
-                case LayerInitializer.Random:
+                case Distribution.Random:
                     {
                         for (int i = 0; i < data.Length; i++)
                         {
@@ -85,31 +94,31 @@ namespace NN01
                         }
                     }
                     break;
-                
-                case LayerInitializer.Normal:
+
+                case Distribution.Normal:
                     {
                         for (int i = 0; i < data.Length; i++)
                         {
                             data[i] = Random.Shared.Normal(0, 1);
                         }
                     }
-                    break; 
+                    break;
 
-                case LayerInitializer.Gaussian:
+                case Distribution.Gaussian:
                     {
                         for (int i = 0; i < data.Length; i++)
                         {
                             data[i] = Random.Shared.Gaussian(0, 1);
                         }
                     }
-                    break; 
-                
-                case LayerInitializer.HeNormal:
+                    break;
+
+                case Distribution.HeNormal:
                     {
                         if (PreviousSize == 0)
                         {
                             // reduce to random 
-                            goto case LayerInitializer.Normal;
+                            goto case Distribution.Normal;
                         }
                         else
                         {
@@ -127,11 +136,11 @@ namespace NN01
                     }
                     break;
 
-                case LayerInitializer.Uniform:
+                case Distribution.Uniform:
                     {
                         MathEx.Uniform(data, 1f);
                     }
-                    break; 
+                    break;
             }
         }
 
@@ -166,7 +175,7 @@ namespace NN01
 
             Vector256<float> wRate;
             Vector256<float> wCost;
-            Span<Vector256<float>> prev; 
+            Span<Vector256<float>> prev;
             if (Avx.IsSupported)
             {
                 wRate = Vector256.Create(weightLearningRate);
@@ -177,25 +186,25 @@ namespace NN01
             {
                 wRate = default;
                 wCost = default;
-                prev = default; 
+                prev = default;
             }
 
-
+            // update bias (avx)
             if (Avx.IsSupported)
             {
                 Span<Vector256<float>> b = MemoryMarshal.Cast<float, Vector256<float>>(Biases!);
                 Span<Vector256<float>> bDelta = MemoryMarshal.Cast<float, Vector256<float>>(BiasDeltas!);
                 Span<Vector256<float>> gi = MemoryMarshal.Cast<float, Vector256<float>>(gamma);
-                int i = 0, ii = 0; 
+                int i = 0, ii = 0;
                 while (i < (Size & ~7))
                 {
                     Vector256<float> deltaBias = Avx.Multiply(gi[ii], Vector256.Create(biasLearningRate));
                     b[ii] = Avx.Subtract(b[ii], Avx.Add(deltaBias, Avx.Multiply(bDelta[ii], Vector256.Create(momentum))));
-                    bDelta[ii] = deltaBias; 
+                    bDelta[ii] = deltaBias;
                     ii += 1;
-                    i += 8; 
+                    i += 8;
                 }
-                while(i < Size)
+                while (i < Size)
                 {
                     float delta = gamma[i] * biasLearningRate;
                     Biases[i] -= delta + (BiasDeltas![i] * momentum);
@@ -203,7 +212,7 @@ namespace NN01
                     i++;
                 }
             }
-            
+
             // calculate new weights and biases for the last layer in the network 
             for (int i = 0; i < Size; i++)
             {
@@ -267,8 +276,42 @@ namespace NN01
                 }
             }
         }
-    }
-    
 
- 
+        /// <summary>
+        /// the easy to read version
+        /// </summary>
+        public void UpdateOnCPU(Layer previous, float[] gamma, float weightLearningRate, float biasLearningRate, float momentum, float weightCost)
+        {
+            // calculate new weights and biases for the last layer in the network 
+            for (int i = 0; i < Size; i++)
+            {
+                float delta = gamma[i] * biasLearningRate;
+                Biases[i] -= delta + (BiasDeltas![i] * momentum);
+                BiasDeltas![i] = delta;
+
+                // apply some learning... move in direction of result using gamma 
+                int j = 0;
+                unchecked
+                {
+                    // calc the rest with scalar math
+                    while (j < previous.Size)
+                    {
+                        delta = previous.Neurons[j] * gamma[i] * weightLearningRate;
+
+                        Weights[i][j] -=
+                            // delta 
+                            delta
+                            // momentum 
+                            + (WeightDeltas![i][j] * momentum)
+                            // strengthen learned weights
+                            + (weightLearningRate * (gamma[i] - weightCost * Weights[i][j]));
+
+                        WeightDeltas[i][j] = delta;
+
+                        j++;
+                    }
+                }
+            }
+        }
+    }
 }

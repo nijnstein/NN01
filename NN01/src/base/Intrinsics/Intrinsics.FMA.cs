@@ -3,12 +3,12 @@ using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Diagnostics.Contracts;
 
 namespace NN01
 {
     static public partial class Intrinsics
     {
-
         /// <summary>
         /// => make sure data is aligned 
         /// c = a * b + c
@@ -25,9 +25,9 @@ namespace NN01
         /// </summary>
         public static Span<float> MultiplyAdd(Span<float> a, Span<float> b, Span<float> c, Span<float> output)
         {
-            int i = 0; 
+            int i = 0;
 
-            if(Avx.IsSupported || Sse.IsSupported)
+            if (Avx.IsSupported || Sse.IsSupported)
             {
                 if (a.Length > 7)
                 {
@@ -74,7 +74,7 @@ namespace NN01
                 }
             }
 
-            return output; 
+            return output;
         }
 
         /// <summary>
@@ -102,18 +102,18 @@ namespace NN01
                 {
                     return Avx.Add(Avx.Multiply(a, b), c);
                 }
-                if(Sse.IsSupported)
+                if (Sse.IsSupported)
                 {
                     Vector128<float> low = Sse.Add(Sse.Multiply(a.GetLower(), b.GetLower()), c.GetLower());
                     Vector128<float> high = Sse.Add(Sse.Multiply(a.GetUpper(), b.GetUpper()), c.GetUpper());
-                    return Vector256.Create(low, high); 
+                    return Vector256.Create(low, high);
                 }
                 else
                 {
                     Span<float> f = stackalloc float[8];
                     for (int i = 0; i < 8; i++)
                     {
-                        f[i] = a.GetElement(i) * b.GetElement(i) + c.GetElement(i);  
+                        f[i] = a.GetElement(i) * b.GetElement(i) + c.GetElement(i);
                     }
                     return MemoryMarshal.Cast<float, Vector256<float>>(f)[0];
                 }

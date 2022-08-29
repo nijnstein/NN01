@@ -126,6 +126,16 @@
       "frameworks": {
         "net6.0": {
           "targetAlias": "net6.0",
+          "dependencies": {
+            "ILGPU": {
+              "target": "Package",
+              "version": "[1.2.0, )"
+            },
+            "ILGPU.Algorithms": {
+              "target": "Package",
+              "version": "[1.2.0, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",

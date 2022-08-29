@@ -1,9 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using ILGPU.Runtime;
+using System.Diagnostics;
+using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
+using System.Security.AccessControl;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace NN01
 {
@@ -13,6 +15,7 @@ namespace NN01
 
         public float Fitness = 0;
         public float Cost = 0;
+        public float CostDelta = 0;
 
         public Layer this[int index]
         {
@@ -28,6 +31,8 @@ namespace NN01
 
         public Layer Input => this[0];
         public Layer Output => this[layers.Length - 1];
+
+        public float[][] Gamma { get; set; } = null;
 
         public NeuralNetwork(int[] layerSizes, LayerActivationFunction[] activations)
         {
@@ -96,7 +101,7 @@ namespace NN01
             }
         }
         
-        internal static Layer CreateLayer(int size, int previousSize = 0, LayerActivationFunction activationType = LayerActivationFunction.None, LayerInitializer weightInit = LayerInitializer.Default, LayerInitializer biasInit = LayerInitializer.Default, bool skipInitializers = false)
+        internal static Layer CreateLayer(int size, int previousSize = 0, LayerActivationFunction activationType = LayerActivationFunction.None, Distribution weightInit = Distribution.Default, Distribution biasInit = Distribution.Default, bool skipInitializers = false)
         {
             if(previousSize == 0)
             {
@@ -150,7 +155,7 @@ namespace NN01
         /// </summary>
         public float[] FeedForward(float[] inputs)
         {
-            // set input 
+            // copy input neurons  
             for (int i = 0; i < inputs.Length; i++)
             {
                 Input.Neurons[i] = inputs[i];
@@ -167,37 +172,67 @@ namespace NN01
             return Output.Neurons;
         }
 
-        public float[] FeedBackward(float[] outputs)
+        public float[] Backward(float[] output)
         {
-            // set output|last layer 
-            for (int i = 0; i < outputs.Length; i++)
+            Debug.Assert(output.Length == Output.Neurons.Length);
+
+            // copy output into neurons in output layer 
+            for (int i = 0; i < output.Length; i++)
             {
-                Output.Neurons[i] = outputs[i];
+                Output.Neurons[i] = output[i];
             }
 
-            // now propagate backwards
-            for (int i = LayerCount - 1; i > 0; i--)
-            {
-                Layer previous = layers[i - 1];
-                Layer current = layers[i]; 
+            // calculate 'gamma' for the last layer
+            // - gamma == derivate activation of previous neuron layer
+            //Output.CalculateGamma(delta, gamma[layers.Length - 1], Output.Neurons);
 
-                // TODO              BackPropagate(current.)
+            // calculate new weights and biases for the last layer in the network 
+            //Output.Update(layers[layers.Length - 2], gamma[layers.Length - 1], weightLearningRate, biasLearningRate, momentum, weightCost);
+
+            // now propagate backward 
+            for (int i = layers.Length - 2; i >= 0; i--)
+            {
+                // update gamma from layer weights and current gamma on output
+                for (int j = 0; j < layers[i].Size; j++)
+                {
+                    Gamma[i][j] = 0;
+                    for (int k = 0; k < Gamma[i + 1].Length; k++)
+                    {
+                        Gamma[i][j] += Gamma[i + 1][k] * layers[i + 1].Weights[k][j];
+                    }
+
+                    layers[i].CalculateGamma(Gamma[i], Gamma[i], layers[i].Neurons);
+                }
             }
 
             return Input.Neurons;
+        } 
+
+        public float CalcMSE(float[][] s1, float[][] sn)
+        {
+            float mse = 0f;
+            unchecked
+            {
+                for (int i = 0; i < s1.Length; i++)
+                {
+                    mse += Intrinsics.SumSquaredDifferences(sn[i], s1[i]);
+                }
+            }
+            return mse;
         }
+
 
         /// <summary>
         /// backtrack state through derivates of the activation minimizing cost/error
         /// </summary>
         public void BackPropagate(
             float[] inputs, float[] expected, float[][] gamma, 
-            float weightLearningRate = 0.01f, float biasLearningRate = 0.01f, float momentum = 1f, float weightCost = 0.00001f)
+            float weightLearningRate = 0.01f, float biasLearningRate = 0.01f, float momentum = 1f, float weightCost = 0.00001f, float minCostDelta = 0.0000001f)
         {
             // initialize neurons from input patterns
             FeedForward(inputs);
 
-            Cost = 0;
+            float cost = 0;
             float[] delta = new float[Output.Neurons.Length];
             for (int i = 0; i < delta.Length; i++)
             {
@@ -205,12 +240,16 @@ namespace NN01
                 delta[i] = Output.Neurons[i] - expected[i];
                                         
                 // calculate cost of network 
-                Cost += (float)Math.Pow(delta[i], 2);
+                cost += delta[i] * delta[i];
             }
+            CostDelta = MathF.Abs(Cost - cost);
+            if (Cost > 0 && CostDelta < minCostDelta) return; 
+            Cost = cost;
 
             // calculate 'gamma' for the last layer
+            // - gamma == derivate activation of previous neuron layer
             Output.CalculateGamma(delta, gamma[layers.Length - 1], Output.Neurons);
-
+  
             // calculate new weights and biases for the last layer in the network 
             Output.Update(layers[layers.Length - 2], gamma[layers.Length - 1], weightLearningRate, biasLearningRate, momentum, weightCost);
 
@@ -220,12 +259,43 @@ namespace NN01
                 // update gamma from layer weights and current gamma on output
                 for (int j = 0; j < layers[i].Size; j++)
                 {
+                    // 
+                    //  get weighed sum of gamma * previous neurons 
+                    // 
+                    int k = 0;
                     gamma[i][j] = 0;
-                    for (int k = 0; k < gamma[i + 1].Length; k++)
+                    if (Avx.IsSupported && gamma[i + 1].Length > 15)
+                    {
+                        Span<Vector256<float>> g = MemoryMarshal.Cast<float, Vector256<float>>(gamma[i + 1]);
+                        Vector256<float> g0 = Vector256<float>.Zero; 
+                        int l = 0; 
+                        while(k < (gamma[i + 1].Length & ~7))
+                        {
+                            g0 = Intrinsics.MultiplyAdd(g[l] , Vector256.Create
+                                (
+                                    // could use gather.. 
+                                    layers[i + 1].Weights[k + 0][j],
+                                    layers[i + 1].Weights[k + 1][j],
+                                    layers[i + 1].Weights[k + 2][j],
+                                    layers[i + 1].Weights[k + 3][j],
+                                    layers[i + 1].Weights[k + 4][j],
+                                    layers[i + 1].Weights[k + 5][j],
+                                    layers[i + 1].Weights[k + 6][j],
+                                    layers[i + 1].Weights[k + 7][j]
+                                ), g0);
+                            k += 8;
+                            l++;
+                        }
+                        gamma[i][j] = Intrinsics.HorizontalSum(g0); 
+                    }
+                    while(k < gamma[i + 1].Length)
                     {
                         gamma[i][j] += gamma[i + 1][k] * layers[i + 1].Weights[k][j];
+                        k++; 
                     }
-
+                    //
+                    // Calculate the new gamma from the activation derivate
+                    //
                     layers[i].CalculateGamma(gamma[i], gamma[i], layers[i].Neurons);
                 }
 

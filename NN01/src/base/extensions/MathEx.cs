@@ -2,6 +2,10 @@
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
+using System.Diagnostics.Contracts;
+using static System.Formats.Asn1.AsnWriter;
+using System.Diagnostics;
+using System.Xml.Linq;
 
 namespace NN01
 {
@@ -59,6 +63,7 @@ namespace NN01
             return output;
         }
 
+        [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Span<float> Exp(Span<float> a)
         {
@@ -209,7 +214,7 @@ namespace NN01
         {
             return f >= 0 ? 1 : -1;
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ArgMax(this Span<float> f)
         {
@@ -230,6 +235,12 @@ namespace NN01
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMax(this float[] f)
+        {
+            return ArgMax(f.AsSpan()); 
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ArgMin(this Span<float> f)
         {
             float min = float.MaxValue;
@@ -246,6 +257,12 @@ namespace NN01
                 }
             }
             return j;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMin(this float[] f)
+        {
+            return ArgMin(f.AsSpan());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -285,5 +302,337 @@ namespace NN01
             }
             return j;
         }
+
+        [Pure][MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Square(this float f) => f * f;
+
+        [Pure][MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static double Square(this double f) => f * f;
+
+        [Pure][MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int Square(this int f) => f * f;
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Average(this float[][] input)
+        {
+            int c = 0;
+            float average = 0;
+            unchecked
+            {
+                for (int i = 0; i < input.Length; i++)
+                {
+                    average += Intrinsics.Sum(input[i]);
+                    c += input[i].Length;
+                }
+            }
+            return average / c;
+        }
+
+
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Average(this Span<float> a) => Intrinsics.Sum(a) / a.Length; 
+        
+        [Pure]                                            
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Variance(this Span<float> a) => Variance(a, Average(a));
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Variance(this float[][] a, float average)
+        {
+            int c = 0; 
+            float sq = 0; 
+            unchecked
+            {
+                for(int i = 0; i < a.Length; i++)
+                {
+                    sq += Intrinsics.SumSquaredDifferences(a[i], average);
+                    c += a.Length; 
+                }
+            }
+            return sq / c;
+        }
+
+        /// <summary>
+        /// V =  sum((a - mean)^2) / a.length
+        /// </summary>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Variance(this Span<float> a, float average) => Intrinsics.SumSquaredDifferences(a, average) / a.Length;
+
+        /// <summary>
+        /// V =  sum((a - mean)^2)  /  sum(a)
+        /// </summary>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float VarianceN(this Span<float> a, float average) => Intrinsics.SumSquaredDifferences(a, average) / Intrinsics.Sum(a);
+
+        /// <summary>
+        /// assumes all elements of a sum to a total of 1, variance is then just the summed squared differences
+        /// </summary>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Variance1(this Span<float> a, float average) => Intrinsics.SumSquaredDifferences(a, average);
+
+        /// <summary>
+        /// euclidian distance between 2 vectors 
+        /// </summary>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Euclid(this Span<float> a, Span<float> b)
+        {
+            Debug.Assert(a.Length == b.Length);
+            float f = 0f; 
+            unchecked
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    f += MathF.Pow(MathF.Abs(a[i] - b[i]), 2);
+                }
+            }
+            return MathF.Sqrt(f);
+        }
+
+
+        /// <summary>
+        /// euclidian distance between 2 vectors 
+        /// </summary>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Euclid(this Span<byte> a, Span<byte> b)
+        {
+            Debug.Assert(a.Length == b.Length); 
+            float f = 0f;
+            unchecked
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    f += MathF.Pow(MathF.Abs(a[i] - b[i]), 2);
+                }
+            }
+            return MathF.Sqrt(f);
+        }
+
+        /// <summary>
+        /// Chebyshev distance between 2 vectors 
+        /// </summary>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static double Chebyshev(this byte[] a, byte[] b)
+        {
+            Debug.Assert(a.Length == b.Length);
+            int max = int.MinValue;
+            unchecked
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    int d = Math.Abs(a[i] - b[i]);
+                    if (d > max) max = d;
+                }
+            }
+            return max;
+        }
+
+        /// <summary>
+        /// Chebyshev distance between 2 vectors 
+        /// </summary>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Chebyshev(this Span<float> a, Span<float> b) 
+        {
+            Debug.Assert(a.Length == b.Length);
+            float max = float.MinValue;
+            unchecked
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    float d = MathF.Abs(a[i] - b[i]);
+                    if (d > max) max = d;
+                }
+            }
+            return max;
+        }
+        
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Manhattan(this Span<float> a, Span<float> b)
+        {
+            Debug.Assert(a.Length == b.Length);
+            float f = 0f;
+            unchecked
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    f += MathF.Abs(a[i] - b[i]);
+                }
+            }
+            return f;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Manhattan(this Span<byte> a, Span<byte> b)
+        {
+            Debug.Assert(a.Length == b.Length);
+            float f = 0f;
+            unchecked
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    f += MathF.Abs(a[i] - b[i]);
+                }
+            }
+            return f;
+        }
+
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Rmse(Span<float> truth, Span<float> prediction)
+        {
+            Debug.Assert(truth.Length != prediction.Length, $"length doesn't match, {truth.Length} != {prediction.Length}");
+            Debug.Assert(truth.Length > 0);
+
+            float rmse = MathF.Sqrt(Intrinsics.AverageSquaredDifferences(truth, prediction)); 
+            return rmse;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Mape(Span<float> truth, Span<float> prediction)
+        {
+            Debug.Assert(truth.Length != prediction.Length, $"length doesn't match, {truth.Length} != {prediction.Length}");
+            Debug.Assert(truth.Length > 0);
+
+            int i = 0;
+            float f = 0; 
+
+            while(i < truth.Length)
+            {
+                f += Math.Abs(truth[i] - prediction[i]) / truth[i];
+                i++; 
+            }
+
+            return f / truth.Length;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Mae(float[] truth, float[] prediction)
+        {
+            Debug.Assert(truth.Length != prediction.Length, $"length doesn't match, {truth.Length} != {prediction.Length}");
+            Debug.Assert(truth.Length > 0); 
+
+            return Intrinsics.SumAbsoluteDifferences(truth, prediction) / truth.Length;
+        }
+
+
+        /// <summary>
+        /// interpolate between a 2d maps of different sizes
+        /// w * h must be equal to input length
+        /// </summary>
+        public static float[] BiLinearInterpolate(this float[] input, int w, int h, int outw, int outh)
+        {
+            Debug.Assert(input.Length == w * h);
+            return input.BiLinearInterpolate(0, 0, w, w, h, outw, outh);
+        }
+
+        /// <summary>
+        /// interpolate between a 2d region in on array to another 2d region of different dimensions
+        /// </summary>
+        public static float[] BiLinearInterpolate(this float[] input, int x0, int y0, int xdim, int w, int h, int outw, int outh)
+        {
+            return BiLinearInterpolate(input, new float[outw * outh], x0, y0, xdim, w, h, outw, outh);
+        }
+
+        /// <summary>
+        /// interpolate between a 2d region in on array to another 2d region of different dimensions
+        /// </summary>
+        public static float[] BiLinearInterpolate(this float[] input, float[] output, int x0, int y0, int xdim, int w, int h, int outw, int outh)
+        {
+            float xr = (float)(w - 1f) / outw;
+            float yr = (float)(h - 1f) / outh;
+
+            unchecked
+            {
+                for (int iy = 0; iy < outh; iy++)
+                {
+                    for (int ix = 0; ix < outw; ix++)
+                    {
+                        int x = (int)(xr * ix);
+                        int y = (int)(yr * iy);
+                        float x_diff = (xr * ix) - x;
+                        float y_diff = (yr * iy) - y;
+                        int idx = (y + y0) * xdim + x + x0;
+
+                        output[iy * outw + ix] =
+                            input[idx] * (1 - x_diff) * (1 - y_diff) +
+                            input[idx + 1] * x_diff * (1 - y_diff) +
+                            input[idx + xdim] * y_diff * (1 - x_diff) +
+                            input[idx + xdim + 1] * x_diff * y_diff;
+                    }
+                }
+            }
+            return output;
+        }
+
+
+        /// <summary>
+        /// in-place 
+        /// </summary>
+        /// <returns>same array object</returns>
+        public static double[] Shift2D(this double[] input, int width, int height)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                int y2 = (y + height / 2) % height;
+                for (int x = 0; x < width; x++)
+                {
+                    int x2 = (x + width / 2) % width;
+                    input[x + y * width] = input[x2 + y2 * width];
+                }
+            }
+            return input;
+        }
+
+        /// <summary>
+        /// align to a 256 bit boundary 
+        /// </summary>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public int Align256(this int i) => ((i + 31) / 32) * 32;
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="x"></param>
+        /// <returns></returns>
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public float ExpFast256(float x)
+        {
+            x = 1f + x / 256f;
+            x *= x; x *= x; x *= x; x *= x;
+            x *= x; x *= x; x *= x; x *= x;
+            return x;
+        }
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public float ExpFast1024(float x)
+        {
+            x = 1f + x / 1024f;
+            x *= x; x *= x; x *= x; x *= x;
+            x *= x; x *= x; x *= x; x *= x;
+            x *= x; x *= x;
+            return x;
+        }
+
     }
 }
+
+
+  

@@ -132,12 +132,6 @@ namespace UnitTests
             Console.ForegroundColor = prev;
         }
 
-        void Reflect(NeuralNetwork network, float[] data)
-        {
-            float[] output = network.FeedBackward(network.FeedForward(data));
-
-            Console.WriteLine($"Reflect {string.Join(' ', data).PadRight(32)} == {string.Join(' ', output).PadLeft(32)}");
-
-        }
+  
     }
 }
