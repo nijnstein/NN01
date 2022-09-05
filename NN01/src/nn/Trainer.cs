@@ -1,4 +1,7 @@
 ﻿using ILGPU.Runtime;
+using NSS;
+using NSS.GPU;
+using NSS.Neural;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -20,158 +23,26 @@ namespace NN01
         private int istep;
         private float currentMomentum;
         private float currentWeightCost;
-
-        public void Reset(NeuralNetwork network, IEnumerable<NeuralNetwork> others, Settings settings = null!)
-        {
-            this.Network = network;
-            this.settings = settings == null ? Settings.Default : settings;
-
-            // initialize a population 
-            Networks = new List<NeuralNetwork>(this.settings.Population);
-            Networks.Add(network);
-            if (others != null)
-            {
-                Networks.AddRange(others);
-            }
-
-            while(Networks.Count < this.settings.Population)
-            {
-                Networks.Add(new NeuralNetwork(network, false));
-            }
-
-            istep = 0;
-            currentMomentum = this.settings.InitialMomentum;
-            currentWeightCost = this.settings.InitialWeightCost;
-        }
-
-        public void Reset(NeuralNetwork network, Settings settings = null!)
-        {
-            Reset(network, null, settings); 
-        }
-
-        public void Step(
-            float[][] patterns,
-            float[][] labels,
-
-            float[][] testPatterns,
-            float[][] testLabels,
-
-            Func<NeuralNetwork, float[][], float[][], float> fitnessEstimator = null!)
-        {
-            Step(
-                patterns, MathEx.Variance(patterns, MathEx.Average(patterns)), labels,
-                testPatterns, testLabels, 
-                fitnessEstimator);
-        }
-
-        public void Step(
-            float[][] patterns, float variance,
-            float[][] labels,
-
-            float[][] testPatterns,
-            float[][] testLabels,
-
-            Func<NeuralNetwork, float[][], float[][], float> fitnessEstimator = null!)
-        {
-            if (settings == null || Network == null || Networks == null || patterns == null || labels == null)
-            {
-                throw new ArgumentNullException();
-            }
-            if (fitnessEstimator == null) fitnessEstimator = settings!.FitnessEstimator;
-            if (testPatterns == null)
-            {
-                testPatterns = patterns;
-                testLabels = labels;
-            }
-
      
-                // train 1 step
-                Parallel.For(0, settings.Population, (j) =>
-                {
-                    Accelerator? acc = GPUContext != null ? GPUContext.CreateAccelerator() : null;
 
-                    // init gamma buffer foreach network if needed 
-                    if (Networks[j].Gamma == null)
-                    {
-                        float[][] gamma = new float[Networks[j].LayerCount][];
-                        for (int i = 0; i < Networks[j].LayerCount; i++)
-                        {
-                            gamma[i] = new float[Networks[j][i].Size];
-                        }
-                        Networks[j].Gamma = gamma;
-                    }
-
-                    // mutate population if:
-                    // - not on the first step 
-                    // - located in bad half 
-                    if (istep > 0 && j < settings.Population / 2)
-                    {
-                        Networks[j + settings.Population / 2].DeepClone(Networks[j]);
-                        Networks[j].Mutate((int)(1 / settings.MutationChance), settings.MutationStrength);
-                    }
-
-                    // back propagate population 
-                    for (int k = 0; k < labels.Length; k++)
-                    {
-                        Networks[j].BackPropagate(patterns[k], labels[k], Networks[j].Gamma, settings.LearningRate, settings.LearningRate, currentMomentum);
-                    }
-
-                    // recalculate fittness 
-                    Networks[j].Fitness = fitnessEstimator(Networks[j], patterns, labels) * fitnessEstimator(Networks[j], testPatterns, testLabels);
-
-                    if (acc != null) acc.Dispose();
-                });
-            
-
-            // sort on fitness condition
-            Networks.Sort();
-
-            // update momemtum 
-            currentMomentum = (settings.FinalMomentum > settings.InitialMomentum) ?
-                Math.Min(settings.FinalMomentum, currentMomentum * settings.MomentumChange)
-                :
-                Math.Max(settings.FinalMomentum, currentMomentum * settings.MomentumChange);
-
-            // update weight resistance 
-            currentWeightCost = (settings.FinalWeightCost > settings.InitialWeightCost) ?
-                Math.Min(settings.FinalWeightCost, currentWeightCost * settings.WeightCostChange)
-                :
-                Math.Max(settings.FinalWeightCost, currentWeightCost * settings.WeightCostChange);
-
-            // the last network in the list is the best
-            Networks[settings.Population - 1].DeepClone(Network);
-        }
-
-        public bool EstimateIfReady(Func<NeuralNetwork, bool>? readyEstimator = null)
-        {
-            Debug.Assert(settings != null);
-            Debug.Assert(Network != null);
-            if (readyEstimator == null)
-            {
-                readyEstimator = settings.ReadyEstimator; 
-            }
-            return Trainer.EstimateIfReady(Network!, readyEstimator, settings!, Networks!);
-        }
-
-
-        #region Older static code, still used in first tests.. todo: refactor that away 
         public static int Train(
             NeuralNetwork network,
-
-            float[][] patterns,
-            float[][] labels,
-
-            float[][] testPatterns,
-            float[][] testLabels,
-
-            Func<NeuralNetwork, float[][], float[][], float> fitnessEstimator,
-            Func<NeuralNetwork, bool> readyEstimator,
-            
-            Settings settings = null!)
+            SampleSet trainingSamples, 
+            SampleSet testSamples,
+            Settings? settings = null)
         {
+            Debug.Assert(network != null);
+            Debug.Assert(trainingSamples != null);
+            Debug.Assert(testSamples != null); 
+
             settings = settings == null ? Settings.Default : settings;
-            if (fitnessEstimator == null) fitnessEstimator = settings.FitnessEstimator;
-            if (readyEstimator == null) readyEstimator = settings.ReadyEstimator;
+ 
+            // prepare samples
+            if(settings.MeanCancelation)
+            {
+                trainingSamples.CancelMeans();
+                testSamples.CancelMeans();                                 
+            }
 
             // initialize a population 
             List<NeuralNetwork> networks = new List<NeuralNetwork>(settings.Population);
@@ -183,7 +54,12 @@ namespace NN01
 
             int istep = 0;
             float currentMomentum = settings.InitialMomentum;
-            float currentWeightCost = settings.InitialWeightCost; 
+            float currentWeightCost = settings.InitialWeightCost;
+            NeuralNetwork best = new NeuralNetwork(network);
+            
+            // shuffle training set 
+            trainingSamples.ShuffleIndices(Random.Shared);
+
 
             for (; istep < settings.Steps; istep++)
             {
@@ -202,28 +78,57 @@ namespace NN01
                         gamma[i] = new float[network[i].Size];
                     }
 
-                    // mutate population if:
+                    // mutate population member if:
                     // - not on the first step 
                     // - located in bad half 
-                    if (istep > 0 && j < settings.Population / 2)
+                    if (settings.MutationChance > 0 && istep > 0 && j < settings.Population / 2)
                     {
-                        networks[j + settings.Population / 2].DeepClone(networks[j]);
-                        networks[j].Mutate((int)(1 / settings.MutationChance), settings.MutationStrength);
+                        networks[(int)(j + settings.Population / 2)].DeepClone(networks[j]);
+                        networks[(int)j].Mutate(settings.MutationChance, settings.WeightMutationStrength, settings.BiasMutationStrength);
                     }
 
-                    // back propagate population 
-                    for (int k = 0; k < labels.Length; k++)
+                    // back propagate population
+                    // 
+                    //   should the cost not be averge of all samples
+                    //  
+                    float cost = 0;
+                    int sampleCount = Math.Min((int)(settings.MiniBatchSize > 0 ? settings.MiniBatchSize : trainingSamples.SampleCount), trainingSamples.SampleCount);
+
+
+                    if (settings.OneByOne)
                     {
-                        networks[j].BackPropagate(patterns[k], labels[k], gamma, settings.LearningRate, settings.LearningRate, currentMomentum, 1E-05f, 1E-07F);
+                        for (int k = 0; k < sampleCount; k++)
+                        {
+                            networks[j].BackPropagate(
+                                trainingSamples.ShuffledData(k),
+                                trainingSamples.ShuffledExpectation(k),
+                                gamma, settings.LearningRate, settings.LearningRate, currentMomentum, 1E-05f, 1E-07F);
+
+                            trainingSamples.Samples[k].Cost = networks[(int)j].Cost;
+                            cost += networks[(int)j].Cost;
+                        }
                     }
+                    else
+                    {
+                        networks[j].BackPropagate(trainingSamples, gamma, settings.LearningRate, settings.LearningRate, currentMomentum, 1E-05f, 1E-07F);
+                    }
+
+
+                    networks[(int)j].Cost = Math.Min(0.999999f, cost / (float)sampleCount * trainingSamples.ClassCount);
 
                     // recalculate fittness 
-                    networks[j].Fitness = fitnessEstimator(networks[j], patterns, labels) * fitnessEstimator(networks[j], testPatterns, testLabels);
+                    networks[(int)j].Fitness = settings.FitnessEstimator(networks[(int)j], trainingSamples) * settings.FitnessEstimator(networks[j], testSamples);
 #if DEBUG
                 }
 #else
-                });                
-#endif 
+                });
+#endif
+
+                // shuffle training set 
+                trainingSamples.ShuffleIndices(Random.Shared);
+
+                // sort the training set
+                // trainingSamples.SortOnErrorAlternatingOnClass(); 
 
                 // sort on fitness condition
                 networks.Sort();
@@ -232,11 +137,10 @@ namespace NN01
                 if (istep < settings.Steps - 1)
                 {
                     // check if the one of the best n% networks passes the ready test 
-                    if(EstimateIfReady(network, readyEstimator, settings, networks))
+                    if (EstimateIfReady(network, settings.ReadyEstimator, settings, networks))
                     {
-                        goto ready; 
+                        goto ready;
                     }
-
                 }
 
                 // update momemtum 
@@ -250,6 +154,27 @@ namespace NN01
                     Math.Min(settings.FinalWeightCost, currentWeightCost * settings.WeightCostChange)
                     :
                     Math.Max(settings.FinalWeightCost, currentWeightCost * settings.WeightCostChange);
+
+
+                // keep best network around
+                if (best.Fitness < networks[settings.Population - 1].Fitness)
+                {
+                    networks[settings.Population - 1].DeepClone(best);
+                }
+                else
+                {
+                    if (best.Fitness > networks[settings.Population - 1].Fitness)
+                    {
+                        best.DeepClone(networks[0]);
+                        networks.Sort();
+                    }
+                }
+
+                // notify 
+                if (settings.OnStep != null)
+                {
+                    settings.OnStep(networks[settings.Population - 1], istep);
+                }
             }
 
             // reaching here implies that the last network is the best we could train
@@ -269,57 +194,28 @@ namespace NN01
                 {
                     // clone best mutation into source network 
                     networks[j].DeepClone(network);
-                    return true; 
+                    return true;
                 }
             }
 
-            return false; 
+            return false;
         }
 
-        public static int Train(NeuralNetwork network, float[][] patterns, int[] classes, float[][] testPatterns, int[] testClasses, Settings settings = null)
+        public static int Train(NeuralNetwork network, float[,] patterns, int[] classes, float[,] testPatterns, int[] testClasses, Settings? settings = null)
         {
-            float[][] CreateOutputLabels(int classCount, int[] classes)
-            {
-                float[][] labels = new float[classes.Length][];
-                for (int i = 0; i < classes.Length; i++)
-                {
-                    labels[i] = new float[classCount];
-                    for (int j = 0; j < classCount; j++)
-                    {
-                        labels[i][j] = classes[i] == j + 1 ? 1f : 0f;
-                    }
-                }
-                return labels;
-            }
-
-            settings = settings == null ? Settings.Default : settings;
-
             return Train(
                 network,
-                patterns,
-                CreateOutputLabels(network.Output.Size, classes),
-                testPatterns,
-                CreateOutputLabels(network.Output.Size, testClasses),
-                settings.FitnessEstimator,
-                settings.ReadyEstimator,
+                new SampleSet(patterns, classes, network.Output.Size),
+                new SampleSet(testPatterns, testClasses, network.Output.Size),
                 settings
             );
         }
 
-        public static int Train(NeuralNetwork network, float[][] patterns, int[] classes, float[][] testPatterns, int[] testClasses, float readyAt, Settings settings = null)
+        public static int Train(NeuralNetwork network, float[][] patterns, int[] classes, float[][] testPatterns, int[] testClasses, Settings? settings = null)
         {
-            settings = settings == null ? Settings.Default : settings;
-
-            settings.ReadyEstimator = (nn) =>
-            {
-                return nn.CostDelta < 0.0001 || (nn.Fitness > readyAt && nn.Cost < nn.Cost - readyAt);
-            };
-
-            return Train(network, patterns, classes, testPatterns, testClasses, settings);
+            return Train(network, ArrayUtils.ConvertTo2D(patterns) , classes, ArrayUtils.ConvertTo2D(testPatterns), testClasses, settings);
         }
 
-    
-        #endregion
 
     }
 }

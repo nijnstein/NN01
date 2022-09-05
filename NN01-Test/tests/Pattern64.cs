@@ -1,4 +1,5 @@
-﻿using NN01; 
+﻿using NN01;
+using NSS;
 using System.Diagnostics;
 
 
@@ -37,17 +38,17 @@ namespace UnitTests
               },
               new LayerActivationFunction[] {
                     LayerActivationFunction.ReLU,
-                    LayerActivationFunction.Swish,
+                    LayerActivationFunction.LeakyReLU,
                     LayerActivationFunction.LeakyReLU,
               }
             );
 
             Trainer.Settings settings = new Trainer.Settings();
-            settings.Population = 100;
-            settings.Steps = 1000; 
+            settings.Population = 1000;
+            settings.Steps = 200; 
             settings.ReadyEstimator = (nn) =>
             {
-                return nn.Fitness > 0.99f && (nn.Cost < 0.01f);
+                return nn.Fitness > 0.999f && (nn.Cost < 0.0001f);
             };
 
             Console.WriteLine($"Training network");
@@ -89,7 +90,7 @@ namespace UnitTests
                         GetBitPattern("NIET"),
 
                         GetBitPattern("0"),
-                   },
+                   }.ConvertTo2D(),
                     new int[]
                     {
                         1,1,1,1,
@@ -102,7 +103,7 @@ namespace UnitTests
                     {
                         GetBitPattern("JA"),
                         GetBitPattern("NEE"),
-                    },
+                    }.ConvertTo2D(),
                     new int[]
                     {
                         1, 0
@@ -137,7 +138,7 @@ namespace UnitTests
             float[] data = GetBitPattern(pattern); 
 
             ConsoleColor prev = Console.ForegroundColor;
-            float[] outputs = network.FeedForward(data);
+            Span<float> outputs = network.FeedForward(data);
             float output = outputs[0];
 
             Console.Write($"Test    {(inset ? "[in training set]" : "[in test set]").PadRight(24)} {pattern.PadRight(32)} == {classIndex} => ");

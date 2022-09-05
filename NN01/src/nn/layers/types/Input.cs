@@ -1,4 +1,5 @@
-﻿using ILGPU.Runtime;
+﻿using ILGPU.Algorithms;
+using ILGPU.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,9 +12,19 @@ namespace NN01
     public class InputLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.None;
-        public InputLayer(int size) : base(size, 0, Distribution.Zeros, Distribution.Zeros) { }
+        public InputLayer(int size) : base(size, 0, LayerInitializationType.Zeros, LayerInitializationType.Zeros) { }
 
-        public override void Activate(Layer previous)
+        public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
+        {
+            unchecked
+            {
+                for (int i = 0; i < inputData.Length; i++)
+                {
+                   outputData[i] = inputData[i];
+                }
+            }
+        }
+        public override void ReversedActivation(Layer next)
         {
             throw new NotImplementedException();
         }
@@ -23,7 +34,7 @@ namespace NN01
             throw new NotImplementedException(); 
         }
 
-        public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
+        public override void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target)
         {
             throw new NotImplementedException();
         }

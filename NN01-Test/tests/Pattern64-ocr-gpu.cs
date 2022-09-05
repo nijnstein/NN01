@@ -3,10 +3,13 @@ using ILGPU.Algorithms;
 using Microsoft.Diagnostics.Tracing.Parsers.ClrPrivate;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
-using NN01; 
+using NN01;
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using NSS;
+using NSS.GPU;
+using NSS.Neural;
 
 namespace UnitTests
 {
@@ -233,39 +236,39 @@ namespace UnitTests
             if(enableGPU && GPUContext.HaveGPUAcceleration)
             {
                 gpuContext = GPUContext.Create();
-                accelerator = gpuContext.CreateAccelerator(); 
+                accelerator = gpuContext.CreateCudaAccelerator();
             }
 
-            NeuralNetwork2 nn = new NeuralNetwork2(
+            GPUTrainer nn = new GPUTrainer(
                                     new LayerInfo()
                                     {
                                         Size = patternSize,
                                         ActivationType = LayerActivationFunction.ReLU,
-                                        WeightInitializer = Distribution.Normal,
-                                        BiasInitializer = Distribution.Random,
+                                        WeightInitializer = NN01.LayerInitializationType.Random,
+                                        BiasInitializer = NN01.LayerInitializationType.Random,
                                         Connectedness = LayerConnectedness.Full,
                                         LayerIndex = 0,
                                         LayerCount = 4
                                     },
                                     new LayerInfo()
                                     {
-                                        Size = 128,
-                                        ActivationType = LayerActivationFunction.Tanh,
-                                        WeightInitializer = Distribution.Gaussian,
-                                        BiasInitializer = Distribution.Gaussian,
+                                        Size = 8 * 4096,
+                                        ActivationType = LayerActivationFunction.ReLU,
+                                        WeightInitializer = NN01.LayerInitializationType.Random,
+                                        BiasInitializer = NN01.LayerInitializationType.Random,
                                         Connectedness = LayerConnectedness.Full,
                                         LayerIndex = 1,
                                         LayerCount = 4
                                     },
                                     new LayerInfo()
                                     {
-                                        Size = 64,
-                                        ActivationType = LayerActivationFunction.LeakyReLU,
-                                        WeightInitializer = Distribution.Random,
-                                        BiasInitializer = Distribution.Random,
+                                        Size = 2 * 4096,
+                                        ActivationType = LayerActivationFunction.ReLU,
+                                        WeightInitializer = NN01.LayerInitializationType.Random,
+                                        BiasInitializer = NN01.LayerInitializationType.Random,
                                         Connectedness = LayerConnectedness.Full,
                                         LayerIndex = 2,
-                                        LayerCount = 4
+                                        LayerCount =4
                                     },
                                     new LayerInfo()
                                     {
@@ -295,11 +298,7 @@ namespace UnitTests
             Console.WriteLine("");
 
 
-            nn.Initialize(accelerator);
 
-            // train for given patterns 
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
 
             List<float[]> patterns = new List<float[]>();
             patterns.AddRange(patternStrings.Select(x => GetPattern(x).ToArray()));
@@ -335,7 +334,23 @@ namespace UnitTests
             classes.AddRange(new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 });
             classes.AddRange(new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 });
 
-            int stepsTrained = 0; 
+            SampleSet trainingData = new SampleSet(patterns.ToArray().ConvertTo2D(), classes.ToArray(), 10);
+            // train for given patterns 
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+
+            nn.Initialize(accelerator);
+
+            sw.Stop();
+            Console.WriteLine($"\n> Initialized in: {sw.Elapsed.TotalMilliseconds.ToString("0.000")}ms\n");
+
+
+            sw.Reset(); 
+            sw.Start();
+
+            int stepsTrained = 0;
+
+            nn.Train(trainingData, accelerator); 
            // int stepsTrained = Trainer.Train
            // (
            //         nn,
@@ -379,7 +394,7 @@ namespace UnitTests
         void Test(NeuralNetwork network, bool inset, float[] pattern, int classIndex)
         {
             ConsoleColor prev = Console.ForegroundColor;
-            float[] outputs = network.FeedForward(pattern);
+            Span<float> outputs = network.FeedForward(pattern);
 
 
             int iclass = outputs.ArgMax();

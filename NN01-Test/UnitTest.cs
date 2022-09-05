@@ -3,6 +3,9 @@ using NN01;
 using System;
 using BenchmarkDotNet.Attributes;
 using System.Text;
+using ILGPU.Algorithms.Random;
+using NSS;
+using NSS.GPU;
 
 namespace UnitTests
 {
@@ -65,6 +68,48 @@ namespace UnitTests
 
             Assert.IsTrue(a[0] >= f - 0.00001f && a[0] <= f + 0.0001f, $"intrinsics.exp {a[0]} != {f}");
         }
+
+
+        [TestCase]
+        public void GPURandom1MxBlockSpan()
+        {
+            GPURandom rnd = new GPURandom(RandomDistributionInfo.Default); 
+
+            for (int i = 0; i < 100000; i++)
+            {
+                Span<float> data = rnd.Span(256);
+
+                Assert.IsTrue(data.Length > 0);
+            }
+        }
+
+
+        [TestCase]
+        public void GPURandom1MxBlockSpanNormal()
+        {
+            GPURandom rnd = new GPURandom(RandomDistributionInfo.Normal(0, 1));
+
+            for (int i = 0; i < 100000; i++)
+            {
+                Span<float> data = rnd.Span(256);
+
+                Assert.IsTrue(data.Length > 0);
+            }
+        }
+        [TestCase]
+        public void GPURandom1MxBlockSpanGaussian()
+        {
+            GPURandom rnd = new GPURandom(RandomDistributionInfo.Gaussian(0, 1));
+
+            for (int i = 0; i < 100000; i++)
+            {
+                Span<float> data = rnd.Span(256);
+
+                Assert.IsTrue(data.Length > 0);
+            }
+        }
+
+
 
         #region AlignedBuffer Tests 
         float[] fbuffer = new float[1000];

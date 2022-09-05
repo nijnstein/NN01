@@ -1,6 +1,7 @@
 ﻿using ILGPU;
 using ILGPU.IR.Values;
 using ILGPU.Runtime;
+using NSS;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,6 +17,8 @@ using System.Threading.Tasks;
 
 namespace NN01
 {
+
+
     public struct LayerInfo 
     {
         public int Size = 0;
@@ -24,13 +27,14 @@ namespace NN01
 
         public LayerActivationFunction ActivationType = LayerActivationFunction.None;
         public LayerConnectedness Connectedness = LayerConnectedness.Full;
-        public Distribution WeightInitializer = Distribution.Random;
-        public Distribution BiasInitializer = Distribution.Random;
+        public LayerInitializationType WeightInitializer = LayerInitializationType.Random;
+        public LayerInitializationType BiasInitializer = LayerInitializationType.Random;
 
         public bool IsInput => LayerIndex == 0 && LayerCount > 0; 
         public bool IsOutput => LayerIndex == LayerCount - 1; 
 
         public const int BufferCount = 6;
+
         public const int NeuronBufferId = 0;
         public const int GammaBufferId = 1;
         public const int WeightBufferId = 2;

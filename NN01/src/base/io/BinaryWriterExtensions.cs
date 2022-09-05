@@ -12,7 +12,7 @@ namespace NN01
         {
             w.Write((byte)activator);
         }
-        static public void Write(this BinaryWriter w, Distribution initializer)
+        static public void Write(this BinaryWriter w, LayerInitializationType initializer)
         {
             w.Write((byte)initializer);
         }

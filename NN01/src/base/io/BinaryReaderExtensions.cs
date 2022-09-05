@@ -12,9 +12,9 @@ namespace NN01
         {
             return (LayerActivationFunction)r.ReadByte();
         }
-        static public Distribution ReadLayerInitializer(this BinaryReader r)
+        static public LayerInitializationType ReadLayerInitializer(this BinaryReader r)
         {
-            return (Distribution)r.ReadByte();
+            return (LayerInitializationType)r.ReadByte();
         }
         static public Layer ReadLayer(this BinaryReader r)
         {
@@ -22,8 +22,8 @@ namespace NN01
             int previousSize = r.ReadInt32();
 
             LayerActivationFunction act = r.ReadLayerActivationFunction();
-            Distribution biasInit = r.ReadLayerInitializer();
-            Distribution weightInit = r.ReadLayerInitializer();
+            LayerInitializationType biasInit = r.ReadLayerInitializer();
+            LayerInitializationType weightInit = r.ReadLayerInitializer();
 
             Layer layer = NeuralNetwork.CreateLayer(size, previousSize, act, weightInit, biasInit, true);
 

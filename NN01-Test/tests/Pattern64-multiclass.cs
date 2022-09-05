@@ -1,4 +1,5 @@
-﻿using NN01; 
+﻿using NN01;
+using NSS;
 using System.Diagnostics;
 
 
@@ -66,7 +67,7 @@ namespace UnitTests
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
-            int stepsTrained = Trainer.Train
+            int stepsTrained =  Trainer.Train
             (
                     nn,
                     new float[][]
@@ -92,7 +93,7 @@ namespace UnitTests
                         GetBitPattern("NIET"),
 
                         GetBitPattern("0"),
-                    },
+                    }.ConvertTo2D(),
                     new int[]
                     {
                         1,1,1,1,
@@ -101,7 +102,7 @@ namespace UnitTests
                         2,2,2,2,
                         2
                     },
-                    new float[][]
+                    (new float[][]
                     {
                         GetBitPattern("ja"),
                         GetBitPattern("YES"),
@@ -125,7 +126,7 @@ namespace UnitTests
 
                         GetBitPattern("0"),
                         GetBitPattern("NON")
-                    },
+                    }).ConvertTo2D(),
                     new int[]
                     {
                         1,1,1,1,
@@ -166,7 +167,7 @@ namespace UnitTests
             float[] data = GetBitPattern(pattern); 
 
             ConsoleColor prev = Console.ForegroundColor;
-            float[] outputs = network.FeedForward(data);
+            Span<float> outputs = network.FeedForward(data);
 
 
             int iclass = outputs.ArgMax();

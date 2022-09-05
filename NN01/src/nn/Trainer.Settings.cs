@@ -1,7 +1,10 @@
-﻿using System;
+﻿using NSS;
+using NSS.Neural;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -29,12 +32,17 @@ namespace NN01
             /// <summary>
             /// chance of a single neurons weight to change
             /// </summary>
-            public float MutationChance { get; set; } = 0.01f;
+            public float MutationChance { get; set; } = 0.05f;
 
             /// <summary>
             /// strenght of any mutation if it occurs 
             /// </summary>
-            public float MutationStrength { get; set; } = 0.5f;
+            public float BiasMutationStrength { get; set; } = 0.1f;
+
+            /// <summary>
+            /// strenght of any mutation if it occurs 
+            /// </summary>
+            public float WeightMutationStrength { get; set; } = 0.2f;
 
             /// <summary>
             /// initial cost of weight changes
@@ -72,6 +80,15 @@ namespace NN01
             public float ReadyTestSlice { get; set; } = 0.05f;
 
             /// <summary>
+            /// bring mean of each sample close 2 zero
+            /// </summary>
+            public bool MeanCancelation { get; set; } = false;
+
+            public int MiniBatchSize { get; set; } = 0;
+
+            public bool OneByOne { get; set; } = true;
+
+            /// <summary>
             /// if enabled uses the power of the gpu 
             /// </summary>                           
             public bool GPU { get; set; } = false;
@@ -81,30 +98,34 @@ namespace NN01
             /// </summary>
             public Func<NeuralNetwork, bool> ReadyEstimator { get; set; } = (nn) =>
             {
-                return (nn.Cost > 0 && nn.CostDelta < 0.000001) || (nn.Fitness > 0.99f && nn.Cost < 0.005f);
+                return (nn.Cost > 0 && nn.CostDelta < 0.0000001) || (nn.Fitness > 0.999999f && nn.Cost < 0.000001f);
             };
 
             /// <summary>
             /// default fitness estimator for current state 
             /// </summary>
-            public Func<NeuralNetwork, float[][], float[][], float> FitnessEstimator { get; set; } = (network, patterns, labels) =>
+            public Func<NeuralNetwork, SampleSet, float> FitnessEstimator { get; set; } = (network, samples) =>
             {
-                Debug.Assert(labels.Length > 0); 
-                if (labels.Length > 0)
+                Debug.Assert(samples.SampleCount > 0); 
+                if (samples.SampleCount > 0)
                 {
                     float fittness = 0;
                     int c = 0;
-                    for (int k = 0; k < labels.Length; k++)
+                    for (int k = 0; k < samples.SampleCount; k++)
                     {
-                        float[] output = network.FeedForward(patterns[k]);
-                        float[] label = labels[k];
+                        Span<float> output = network.FeedForward(samples.SampleData(k));
+                        Span<float> label = samples.SampleExpectation(k);
 
                         fittness += Intrinsics.SumSquaredDifferences(label, output);
                     }
-                    return 1f - Math.Max(0f, Math.Min(1f, fittness / (labels.Length * labels[0].Length)));
+                    return 1f - Math.Max(0f, Math.Min(1f, fittness / samples.SampleCount * samples.ClassCount));
                 }
                 return float.NaN; 
             };
+
+            public delegate void OnStepEvent(NeuralNetwork network, int step); 
+            public OnStepEvent OnStep = null;
+
 
             /// <summary>
             /// Default settings 

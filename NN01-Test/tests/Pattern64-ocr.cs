@@ -1,5 +1,6 @@
 ﻿using Microsoft.Diagnostics.Tracing.Parsers.ClrPrivate;
-using NN01; 
+using NN01;
+using NSS;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -228,8 +229,8 @@ namespace UnitTests
               new int[]
               {
                   patternSize,
-                  128,
                   64,
+                  32,
                   10
               },
               new LayerActivationFunction[] {
@@ -240,13 +241,14 @@ namespace UnitTests
             );
 
             Trainer.Settings settings = new Trainer.Settings();
-            settings.Population = 1000;
+            settings.Population = 100;
             settings.Steps = steps;
             settings.GPU = false; 
             settings.ReadyEstimator = (nn) =>
             {
                 return /* (nn.Cost > 0 && nn.CostDelta < 0.000001) || */ (nn.Fitness > 0.99f && nn.Cost < 0.005f);
             };
+         //   settings.OnStep = (NeuralNetwork network, int step) => Console.WriteLine($"> Step: {(step.ToString().PadRight(10))} Cost: {(network.Cost.ToString("0.0000").PadRight(10))} Fitness:  {(network.Fitness.ToString("0.0000").PadRight(10))}");
 
 
             Console.WriteLine($"Training network");
@@ -299,9 +301,9 @@ namespace UnitTests
             int stepsTrained = Trainer.Train
             (
                     nn,
-                    patterns.ToArray(),
+                    patterns.ToArray().ConvertTo2D(),
                     classes.ToArray(),
-                    testStrings.Select(x => GetPattern(x).ToArray()).ToArray(),
+                    testStrings.Select(x => GetPattern(x).ToArray()).ToArray().ConvertTo2D(),
                     new int[]
                     {
                         1, 2, 3, 4, 5, 6, 7, 8, 9, 10
@@ -350,7 +352,7 @@ namespace UnitTests
         void Test(NeuralNetwork network, bool inset, float[] pattern, int classIndex)
         {
             ConsoleColor prev = Console.ForegroundColor;
-            float[] outputs = network.FeedForward(pattern);
+            Span<float> outputs = network.FeedForward(pattern);
 
 
             int iclass = outputs.ArgMax();
