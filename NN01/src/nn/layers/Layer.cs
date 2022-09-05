@@ -18,7 +18,10 @@ namespace NN01
     public abstract class Layer
     {
         public float[] Neurons;
-        public float[] Gamma;   // derivate(activation) 
+
+        public float[] Delta;   // error * derivate 
+        public float[] Gamma;   // derivate of activation
+
 
         public float[][] Weights;
         public float[] Biases;
@@ -47,6 +50,7 @@ namespace NN01
             PreviousSize = previousSize;
             Neurons = new float[size];
             Gamma = new float[size]; // should not create on last.. 
+            Delta = new float[size]; 
 
             WeightInitializer = weightInit;
             BiasInitializer = biasInit;
@@ -82,6 +86,10 @@ namespace NN01
         {
             Activate(previous, previous.Neurons, Neurons);
         }
+        public void Derivate(Span<float> output)
+        {
+            Derivate(Neurons, output); 
+        }
 
         public abstract void Activate(Layer previous, Span<float> inputData, Span<float> outputData);
         public abstract void ReversedActivation(Layer next);
@@ -93,7 +101,7 @@ namespace NN01
         /// <param name="gamma"></param>
         /// <param name="target"></param>
         public abstract void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target);
-        public abstract void Derivate(Span<float> output);
+        public abstract void Derivate(Span<float> input, Span<float> output);
 
         private void InitializeDistribution(LayerInitializationType initializer, float[] data, IRandom random)
         {

@@ -34,16 +34,16 @@ namespace UnitTests
                 }
                 else
                 {
-                      new LogicGate4Way().Run();
+                   //   new LogicGate4Way().Run();
                     Console.WriteLine("");
                     Console.WriteLine("");
 
-                      new Pattern64().Run();
+                   //   new Pattern64().Run();
 
                     Console.WriteLine("");
                     Console.WriteLine("");
 
-                    new Digit_ocr().Run(200);
+                    new Digit_ocr().Run(50);
 
 
 
