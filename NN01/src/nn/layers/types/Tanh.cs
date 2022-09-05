@@ -80,14 +80,15 @@ namespace NN01
             throw new NotImplementedException();
         }
 
-        public override void Derivate(Span<float> output)
+        public override void Derivate(Span<float> input, Span<float> output)
         {
+            Debug.Assert(input != null);
             Debug.Assert(output != null);
-            Debug.Assert(output.Length == this.Neurons.Length);
+            Debug.Assert(output.Length == input.Length);
 
             for (int j = 0; j < Size; j++)
             {
-                output[j] = ActivationFunctions.TanhFastDerivative(Neurons[j]);
+                output[j] = ActivationFunctions.TanhFastDerivative(input[j]);
             }
         }
 

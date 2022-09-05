@@ -29,7 +29,7 @@ namespace NN01
             throw new NotImplementedException();
         }
 
-        public override void Derivate(Span<float> output)
+        public override void Derivate(Span<float> input, Span<float> output)
         {
             throw new NotImplementedException(); 
         }

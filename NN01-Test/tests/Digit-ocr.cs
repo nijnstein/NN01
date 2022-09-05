@@ -15,12 +15,13 @@ namespace UnitTests
     {
         const int ClassCount = 2; 
         int patternSize = 28 * 28;  // 784
-        string filename = "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_nn01.bin"; 
+
+        string filename = $"..\\..\\..\\..\\Handwritten Digit Samples\\mnist_nn01.bin"; 
 
 
         string[] trainingDataSets = new string[] {
-            "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train0.jpg",
-            "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train1.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train0.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train1.jpg",
  //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train2.jpg",
  //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train3.jpg",
  //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train4.jpg",
@@ -32,8 +33,8 @@ namespace UnitTests
         };
 
         string[] testDataSets = new string[] {
-            "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test0.jpg",
-            "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test1.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test0.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test1.jpg",
  //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test2.jpg",
  //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test3.jpg",
  //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test4.jpg",
@@ -70,7 +71,7 @@ namespace UnitTests
             settings.GPU = allowGPU && GPUContext.HaveGPUAcceleration;
             settings.MiniBatchSize = 0;
             settings.LearningRate = 0.05f;
-            settings.OneByOne = true;
+            settings.OneByOne = false;
             settings.ReadyEstimator = (nn) =>
             {
                 return  (nn.Cost < 0.001f && nn.Cost != 0);
