@@ -8,36 +8,38 @@ using System.Runtime.Intrinsics;
 using System.Text;
 using System.Threading.Tasks;
 using ILGPU.Runtime;
+using NSS;
 
 namespace NN01
 {
     public class TanhLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Tanh;
-        public TanhLayer(int size, int previousSize, Distribution weightInit = Distribution.Default, Distribution biasInit = Distribution.Default, bool skipInit = false)
+        public TanhLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInit = false, IRandom random = null)
             : base
             (
                   size,
                   previousSize,
-                  weightInit == Distribution.Default ? Distribution.HeNormal : weightInit,
-                  biasInit == Distribution.Default ? Distribution.Random : biasInit,
-                  skipInit
+                  weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
+                  biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
+                  skipInit, 
+                  random
             )
         {
         }
-        public override void Activate(Layer previous)
+        public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
         {
             for (int j = 0; j < Size; j++)
             {
-                float value = Intrinsics.SumWeighted(Weights[j], previous.Neurons) + Biases[j];
+                float value = Intrinsics.SumWeighted(Weights[j], inputData) + Biases[j];
 
                 if (Avx.IsSupported)
                 {
-                    Neurons[j] = value;
+                    outputData[j] = value;
                 }
                 else
                 {
-                    Neurons[j] = value / (1f + MathF.Abs(value));
+                    outputData[j] = value / (1f + MathF.Abs(value));
                 }
                 
             }
@@ -50,7 +52,7 @@ namespace NN01
                 if (Size > 7)
                 {
                     Vector256<float> a1 = Vector256.Create(1f); 
-                    Span<Vector256<float>> n = MemoryMarshal.Cast<float, Vector256<float>>(Neurons);
+                    Span<Vector256<float>> n = MemoryMarshal.Cast<float, Vector256<float>>(outputData);
                     while (i < (Size & ~7))
                     {
                         n[j] = Avx.Divide(n[j] 
@@ -66,12 +68,18 @@ namespace NN01
                 }
                 while (i < Size)
                 {
-                    Neurons[i] = Neurons[i] / (1f + MathF.Abs(Neurons[i]));
+                    outputData[i] = outputData[i] / (1f + MathF.Abs(outputData[i]));
                     i++; 
                 }
 
             }
         }
+
+        public override void ReversedActivation(Layer next)
+        {
+            throw new NotImplementedException();
+        }
+
         public override void Derivate(Span<float> output)
         {
             Debug.Assert(output != null);
@@ -83,7 +91,7 @@ namespace NN01
             }
         }
 
-        public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
+        public override void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target)
         {
             int i = 0, j = 0;
 

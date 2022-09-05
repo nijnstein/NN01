@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>UnitTests.Benchmark-20220826-223201</title>
+<title>UnitTests.Benchmark-20220904-010221</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -22,10 +22,14 @@ Intel Core i9-9900K CPU 3.60GHz (Coffee Lake), 1 CPU, 16 logical and 8 physical 
 <pre><code></code></pre>
 
 <table>
-<thead><tr><th>                             Method</th><th>  Mean</th><th>Error</th><th>StdDev</th>
+<thead><tr><th>                   Method</th><th>   Mean</th><th>  Error</th><th>  StdDev</th><th> Median</th>
 </tr>
-</thead><tbody><tr><td>AlignedBuffer_SumAvxAlignedBufferedSingle</td><td>75.13 ns</td><td>1.222 ns</td><td>1.083 ns</td>
-</tr><tr><td>AlignedBuffer_SumAvxAlignedBufferedx1000</td><td>14,638.42 ns</td><td>292.046 ns</td><td>299.909 ns</td>
+</thead><tbody><tr><td>GPURandom1MxSingle</td><td>1.982 &mu;s</td><td>0.0289 &mu;s</td><td>0.0256 &mu;s</td><td>1.977 &mu;s</td>
+</tr><tr><td>GPURandom1000xSingleNormal</td><td>2.976 &mu;s</td><td>0.0557 &mu;s</td><td>0.0521 &mu;s</td><td>2.961 &mu;s</td>
+</tr><tr><td>GPURandom1000xSingleGaussian</td><td>4.823 &mu;s</td><td>0.3989 &mu;s</td><td>1.1761 &mu;s</td><td>5.389 &mu;s</td>
+</tr><tr><td>GPURandom1MxBlockSpan</td><td>19,411.628 &mu;s</td><td>366.3882 &mu;s</td><td>342.7198 &mu;s</td><td>19,418.645 &mu;s</td>
+</tr><tr><td>GPURandom1000xBlockSpanNormal</td><td>85,024.736 &mu;s</td><td>1,706.8877 &mu;s</td><td>4,758.1207 &mu;s</td><td>85,107.850 &mu;s</td>
+</tr><tr><td>GPURandom1000xBlockSpanGaussian</td><td>87,378.185 &mu;s</td><td>4,875.1305 &mu;s</td><td>14,374.4323 &mu;s</td><td>82,886.991 &mu;s</td>
 </tr></tbody></table>
 </body>
 </html>

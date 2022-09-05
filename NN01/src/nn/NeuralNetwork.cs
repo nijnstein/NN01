@@ -1,4 +1,7 @@
 ﻿using ILGPU.Runtime;
+using NSS;
+using NSS.GPU;
+using NSS.Neural;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -90,8 +93,8 @@ namespace NN01
                     other.layers[i - 1].Size,
                     other.layers[i].ActivationType,
                     other.layers[i].WeightInitializer,
-                    other.layers[i].BiasInitializer,
-                    !clone
+                    other.layers[i].BiasInitializer,                        
+                    clone
                 );
             }
 
@@ -100,8 +103,29 @@ namespace NN01
                 other.DeepClone(this);
             }
         }
-        
-        internal static Layer CreateLayer(int size, int previousSize = 0, LayerActivationFunction activationType = LayerActivationFunction.None, Distribution weightInit = Distribution.Default, Distribution biasInit = Distribution.Default, bool skipInitializers = false)
+
+        public NeuralNetwork(NeuralNetwork other, GPURandom random)
+        {
+            layers = new Layer[other.layers.Length];
+
+            layers[0] = CreateLayer(other.layers[0].Size);
+
+            for (int i = 1; i < other.layers.Length; i++)
+            {
+                layers[i] = CreateLayer(
+                    other.layers[i].Size,
+                    other.layers[i - 1].Size,
+                    other.layers[i].ActivationType,
+                    other.layers[i].WeightInitializer,
+                    other.layers[i].BiasInitializer,
+                    false,
+                    random
+                );
+            }
+        }
+
+
+        internal static Layer CreateLayer(int size, int previousSize = 0, LayerActivationFunction activationType = LayerActivationFunction.None, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInitializers = false, GPURandom random = null)
         {
             if(previousSize == 0)
             {
@@ -111,22 +135,22 @@ namespace NN01
             switch (activationType)
             {
                 case LayerActivationFunction.ReLU:
-                    return new ReLuLayer(size, previousSize, weightInit, biasInit, skipInitializers);
+                    return new ReLuLayer(size, previousSize, weightInit, biasInit, skipInitializers, random);
 
                 case LayerActivationFunction.LeakyReLU:
-                    return new LeakyReLuLayer(size, previousSize, weightInit, biasInit, skipInitializers);
+                    return new LeakyReLuLayer(size, previousSize, weightInit, biasInit, skipInitializers, random);
 
                 case LayerActivationFunction.Tanh:
-                    return new TanhLayer(size, previousSize, weightInit, biasInit, skipInitializers);
+                    return new TanhLayer(size, previousSize, weightInit, biasInit, skipInitializers, random);
 
                 case LayerActivationFunction.Sigmoid:
-                    return new SigmoidLayer(size, previousSize, weightInit, biasInit, skipInitializers);
+                    return new SigmoidLayer(size, previousSize, weightInit, biasInit, skipInitializers, random);
                     
                 case LayerActivationFunction.Swish:
-                    return new SwishLayer(size, previousSize, weightInit, biasInit, skipInitializers);
+                    return new SwishLayer(size, previousSize, weightInit, biasInit, skipInitializers, random);
 
                 case LayerActivationFunction.Binary:
-                    return new BinaryLayer(size, previousSize, weightInit, biasInit, skipInitializers);
+                    return new BinaryLayer(size, previousSize, weightInit, biasInit, skipInitializers, random);
             }
 
             throw new InvalidLayerException($"cannot create layer, size: {size}, previous size: {previousSize}, activation: {activationType}, weight: {weightInit}, bias: {biasInit}, skip init: {skipInitializers}"); 
@@ -153,7 +177,7 @@ namespace NN01
         /// <summary>
         /// feed forward, inputs -> outputs.
         /// </summary>
-        public float[] FeedForward(float[] inputs)
+        public Span<float> FeedForward(Span<float> inputs)
         {
             // copy input neurons  
             for (int i = 0; i < inputs.Length; i++)
@@ -161,6 +185,7 @@ namespace NN01
                 Input.Neurons[i] = inputs[i];
             }
 
+            
             // propagate state through layers 
             for (int i = 1; i < layers.Length; i++)
             {
@@ -171,6 +196,51 @@ namespace NN01
             // return the output neuron state 
             return Output.Neurons;
         }
+
+        /// <summary>
+        /// 
+        ///  Feed forward all samples in the set (or minibatch if enabled) 
+        ///  - uses shuffled indices 
+        ///  - updates sample error 
+        ///  - stored actual|output activation in samples.Actual buffer instead of network output neurons
+        /// 
+        /// </summary>
+        /// <returns>total input set error</returns>
+
+        public float FeedForward(SampleSet samples)
+        {
+            float error = 0f; 
+
+            for(int sampleIndex = 0; sampleIndex < samples.SampleCount; sampleIndex++)
+            {
+                // activate first hidden layer from sample data
+                layers[1].Activate(layers[0], samples.ShuffledData(sampleIndex), layers[1].Neurons); 
+
+                // propagate state through hidden layers 
+                for (int i = 2; i < layers.Length - 1; i++)
+                {
+                    layers[i].Activate(layers[i - 1]);
+                }
+
+                // then activate the last into the actual buffer eliminating the copy later 
+                Span<float> actual = samples.ShuffledActual(sampleIndex);
+                layers[layers.Length - 1].Activate(
+                    layers[layers.Length - 2],
+                    layers[layers.Length - 2].Neurons, 
+                    actual); 
+
+                // get error between actual and ideal output 
+                Span<float> ideal = samples.ShuffledExpectation(sampleIndex);
+
+                float sampleError = Intrinsics.SumSquaredDifferences(actual, ideal) * 0.5f;
+                error += sampleError;
+                samples.SetShuffledError(sampleIndex, sampleError);
+            }          
+            
+            return error / samples.SampleCount; 
+        }
+
+  
 
         public float[] Backward(float[] output)
         {
@@ -221,12 +291,116 @@ namespace NN01
             return mse;
         }
 
-
         /// <summary>
-        /// backtrack state through derivates of the activation minimizing cost/error
+        /// 
         /// </summary>
+        /// <param name="trainingSet"></param>
+        /// <param name="gamma"></param>
+        /// <param name="weightLearningRate"></param>
+        /// <param name="biasLearningRate"></param>
+        /// <param name="momentum"></param>
+        /// <param name="weightCost"></param>
+        /// <param name="minCostDelta"></param>
         public void BackPropagate(
-            float[] inputs, float[] expected, float[][] gamma, 
+            SampleSet trainingSet,
+            float[][] gamma,
+            float weightLearningRate = 0.01f, float biasLearningRate = 0.01f, float momentum = 1f, float weightCost = 0.00001f, float minCostDelta = 0.0000001f)
+        {
+            // shuffle training set 
+            trainingSet.ShuffleIndices(Random.Shared);
+
+            // feed forward all samples and get the total error 
+            float totalError = FeedForward(trainingSet);
+
+            // calculate total error change foreach output
+            Span2D<float> actual = trainingSet.Actual.AsSpan2D<float>();
+            Span2D<float> expected = trainingSet.Expectation.AsSpan2D<float>();
+
+            // calculate error on each weight going from  prev.neuron[E].weight[i] -> out[i]
+            // known as the delta rule: -(target - out) * derivative(out) * out 
+
+            for (int layerIndex = layers.Length - 1; layerIndex > 0; layerIndex--)
+            {
+                if (layers[layerIndex].WeightDeltas == null)
+                {
+                    layers[layerIndex].InitializeDeltaBuffers();
+                }
+            }
+
+            for (int layerIndex = layers.Length - 1; layerIndex > 0; layerIndex--)
+            {
+                Span2D<float> delta = new float[trainingSet.SampleCount, layers[layerIndex].Size].AsSpan2D<float>();
+
+                for (int sampleIndex = 0; sampleIndex < trainingSet.SampleCount; sampleIndex++)
+                {
+                    Span<float> d = delta.Row(sampleIndex);
+                    Span<float> a = layerIndex == layers.Length - 1 ? actual.Row(sampleIndex) : layers[layerIndex].Neurons.AsSpan();
+                    Span<float> e = layerIndex == layers.Length - 1 ? expected.Row(sampleIndex) : gamma[layerIndex];
+
+                    for (int i = 0; i < layers[layerIndex].Size; i++)
+                    {
+                        d[i] = (a[i] - e[i]); //  * a[i];   out h1  -> neuron connected via current wieght to output?
+                    }
+
+                    // apply derivate to actual (inline) 
+                    layers[layerIndex].Derivate(a);
+
+                    // update hidden actual 
+                    gamma[layerIndex - 1].Zero(); 
+                    for (int j = 0; j < layers[layerIndex].Size; j++)
+                    {
+                        for (int k = 0; k < layers[layerIndex - 1].Size; k++)
+                        {
+                            gamma[layerIndex - 1][k] += d[j] * a[j] * layers[layerIndex].Weights[j][k];
+                        }
+                    }
+                }
+
+                // get total delta ?????
+                Span<float> dd = new float[layers[layerIndex].Size].AsSpan();
+                dd.Zero();
+                for (int sampleIndex = 0; sampleIndex < trainingSet.SampleCount; sampleIndex++)
+                {
+                    Span<float> a = layerIndex == layers.Length - 1 ? actual.Row(sampleIndex) : layers[layerIndex].Neurons.AsSpan();
+
+                    for (int i = 0; i < dd.Length; i++)
+                    {
+                        dd[i] += delta[sampleIndex, i] * a[i];
+                    }
+                }
+
+                // we now have a delta for each activation 
+                for (int i = 1; i < layers[layerIndex].Size; i++)
+                {
+                    for (int j = 0; j < layers[layerIndex - 1].Size; j++)
+                    {
+                        layers[layerIndex].WeightDeltas[i][j] =
+
+                            layers[layerIndex].Weights[i][j] - dd[i] * weightLearningRate;
+                    }
+                }
+            }
+
+            // update weights 
+            for (int layerIndex = layers.Length - 1; layerIndex > 1; layerIndex--)
+            {
+                for (int i = 0; i < layers[layerIndex].Size; i++)
+                {
+                    for (int j = 0; j < layers[layerIndex - 1].Size; j++)
+                    {                                
+                        layers[layerIndex - 1].Weights[i][j] -=  layers[layerIndex - 1].WeightDeltas[i][j];
+                    }
+                }
+            }
+
+            Cost = totalError; 
+        }
+
+            /// <summary>
+            /// backtrack state through derivates of the activation minimizing cost/error
+            /// </summary>                
+            public void BackPropagate(
+            Span<float> inputs, Span<float> expected, float[][] gamma, 
             float weightLearningRate = 0.01f, float biasLearningRate = 0.01f, float momentum = 1f, float weightCost = 0.00001f, float minCostDelta = 0.0000001f)
         {
             // initialize neurons from input patterns
@@ -307,15 +481,16 @@ namespace NN01
         /// <summary>
         /// randomly mutate some of the worst networks
         /// </summary>
-        public void Mutate(int high, float val) 
+        public void Mutate(float chance, float weightRange, float biasRange) 
         {
             for (int i = 1; i < LayerCount; i++)
             {
                 for (int j = 0; j < layers[i].Biases.Length; j++)
                 {
-                    layers[i].Biases[j] = Random.Shared.NextSingle() * high <= 2
+                    layers[i].Biases[j] = 
+                        Random.Shared.NextSingle() > chance
                         ?
-                        layers[i].Biases[j] += Random.Shared.Range(-val, val)
+                        layers[i].Biases[j] += Random.Shared.Range(-biasRange, biasRange)
                         :
                         layers[i].Biases[j];
                 }
@@ -327,7 +502,12 @@ namespace NN01
                 {
                     for (int k = 0; k < layers[i].Weights[j].Length; k++)
                     {
-                        layers[i].Weights[j][k] = Random.Shared.Range(0f, high) <= 2 ? layers[i].Weights[j][k] += Random.Shared.Range(-val, val) : layers[i].Weights[j][k];
+                        layers[i].Weights[j][k] = 
+                            Random.Shared.NextSingle() > chance 
+                            ? 
+                            layers[i].Weights[j][k] += Random.Shared.Range(-weightRange, weightRange) 
+                            :
+                            layers[i].Weights[j][k];
                     }
                 }
             }

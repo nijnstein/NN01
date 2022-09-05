@@ -3,6 +3,7 @@ using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Validators;
 using NN01;
 using System.Runtime.CompilerServices;
+using Test;
 
 namespace UnitTests
 {
@@ -20,54 +21,81 @@ namespace UnitTests
         }
 
         static void Main(string[] args)
-        {             
-            Console.WriteLine("Press [B] to benchmark, any other for test run.");
-            if (Console.ReadKey().Key == ConsoleKey.B)
+        {
+            do
             {
-                BenchmarkRunner.Run<Benchmark>(new AllowNonOptimized());
-            }
-            else
-            {
-                do
+                Console.WriteLine("Press [B] to benchmark, any other for test run.");
+                if (Console.ReadKey().Key == ConsoleKey.B)
                 {
-                //    new LogicGate4Way().Run();
-                //    Console.WriteLine("");
-                //    Console.WriteLine("");
-                //
-                //    new Pattern64().Run();
-                //
-                //    Console.WriteLine("");
-                //    Console.WriteLine("");
-                //
-                //    new Pattern64_multiclass().Run();
-                //
-                //    Console.WriteLine("");
-                //    Console.WriteLine("");
-                //
-                //    new Pattern64_ocr().Run(100);
-                //
-                //    Console.WriteLine("");
-                //    Console.WriteLine("");
-               
-                    try
-                    {
-                        new Pattern64_ocr_gpu().Run(20, true);
-                    }
-                    catch(Exception ex)
-                    {
-                        Console.WriteLine(ex.ToString()); 
-                    }
-
-                    Console.WriteLine("");
-                    Console.WriteLine("");
-
-                    Console.WriteLine("[SPACEBAR] to run tests again, any other to exit");
-                    Console.WriteLine("");
-                    Console.WriteLine("");
-
+                    //BenchmarkRunner.Run<Benchmark>(new AllowNonOptimized());
+                    //BenchmarkRunner.Run<AlignedBufferBenchmark>(new AllowNonOptimized());
+                    //BenchmarkRunner.Run<IntrinsicsBenchmark>(new AllowNonOptimized());
+                    BenchmarkRunner.Run<GPURandomBenchmarks>(new AllowNonOptimized());
                 }
-                while (Console.ReadKey().Key == ConsoleKey.Spacebar);
+                else
+                {
+                      new LogicGate4Way().Run();
+                    Console.WriteLine("");
+                    Console.WriteLine("");
+
+                      new Pattern64().Run();
+
+                    Console.WriteLine("");
+                    Console.WriteLine("");
+
+                    new Digit_ocr().Run(200);
+
+
+
+
+
+
+
+
+
+
+                    // new Pattern64_cpu().Run();
+
+                    // Console.WriteLine("");
+                    //Console.WriteLine("");
+
+                    // new Pattern64_multiclass().Run();
+
+                    //  Console.WriteLine("");
+                    //   Console.WriteLine("");
+
+
+                    // new Pattern64_ocr().Run(1000);
+
+                    //   Console.WriteLine("");
+                    //   Console.WriteLine("");
+                    //
+                    // try
+                    //// {
+                    ////     new Pattern64_ocr_gpu().Run(2, true);
+                    //// }
+                    //// catch (Exception ex)
+                    //// {
+                    ////     Console.WriteLine(ex.ToString());
+                    //// }
+                    ////
+                    //// Console.WriteLine("");
+                    ////
+                    //// Console.WriteLine("");
+                    //// try
+                    //// {
+                    ////     new Pattern64_ocr_gpu().Run(2, false);
+                    //// }
+                    //// catch (Exception ex)
+                    //// {
+                    //     Console.WriteLine(ex.ToString());
+                    // }
+
+                    Console.WriteLine("");
+                    Console.WriteLine("");
+                }
             }
+            while (Console.ReadKey().Key == ConsoleKey.Spacebar);
         }
     }
 }

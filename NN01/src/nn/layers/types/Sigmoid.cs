@@ -1,4 +1,5 @@
 ﻿using ILGPU.Runtime;
+using NSS;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,18 +12,19 @@ namespace NN01
     public class SigmoidLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Sigmoid;
-        public SigmoidLayer(int size, int previousSize, Distribution weightInit = Distribution.Default, Distribution biasInit = Distribution.Default, bool skipInit = false)
+        public SigmoidLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInit = false, IRandom random = null)
             : base
             (
                   size,
                   previousSize,
-                  weightInit == Distribution.Default ? Distribution.Normal : weightInit,
-                  biasInit == Distribution.Default ? Distribution.Random : biasInit,
-                  skipInit
+                  weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
+                  biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
+                  skipInit, 
+                  random
             )
         {
         }
-        public override void Activate(Layer previous)
+        public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
         {
             for (int j = 0; j < Size; j++)
             {
@@ -30,7 +32,7 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += Weights[j][k] * previous.Neurons[k];
+                    value += Weights[j][k] * inputData[k];
                 }
 
                 // apply bias
@@ -38,9 +40,15 @@ namespace NN01
 
                 // sigmoid activation  
                 float f = MathF.Exp(value);
-                Neurons[j] = f / (1.0f + f);
+                outputData[j] = f / (1.0f + f);
             }
         }
+
+        public override void ReversedActivation(Layer next)
+        {
+            throw new NotImplementedException();
+        }
+
 
         public override void Derivate(Span<float> output)
         {
@@ -54,7 +62,7 @@ namespace NN01
         }
 
 
-        public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
+        public override void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target)
         {
             // gamma == difference times  activationDerivative(neuron value)
             for (int i = 0; i < Size; i++)

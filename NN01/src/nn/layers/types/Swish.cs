@@ -8,25 +8,27 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using ILGPU.Runtime;
+using NSS;
 
 namespace NN01
 {
     public class SwishLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Swish;
-        public SwishLayer(int size, int previousSize, Distribution weightInit = Distribution.Default, Distribution biasInit = Distribution.Default, bool skipInit = false)
+        public SwishLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInit = false, IRandom random = null)
             : base
             (
                   size,
                   previousSize,
-                  weightInit == Distribution.Default ? Distribution.HeNormal : weightInit,
-                  biasInit == Distribution.Default ? Distribution.Random : biasInit,
-                  skipInit
+                  weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
+                  biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
+                  skipInit, 
+                  random
             )
         {
         }
 
-        public override void Activate(Layer previous)
+        public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
         {
             Span<float> buffer = stackalloc float[previous.Size];
  
@@ -34,14 +36,14 @@ namespace NN01
             for (j = 0; j < Size; j++)
             {
                 // compute sum of weights multiplied with input neurons then add bias
-                float value = Intrinsics.SumWeighted(Weights[j], previous.Neurons) + Biases[j];
-                Neurons[j] = value; // .Swish();
+                float value = Intrinsics.SumWeighted(Weights[j], inputData) + Biases[j];
+                outputData[j] = value; // .Swish();
             }
 
             int i = 0; j = 0;
             if (Avx2.IsSupported)
             {
-                Span<Vector256<float>> n = MemoryMarshal.Cast<float, Vector256<float>>(Neurons);
+                Span<Vector256<float>> n = MemoryMarshal.Cast<float, Vector256<float>>(outputData);
                 Vector256<float> a1 = Vector256.Create(1f);
                 Vector256<float> a05 = Vector256.Create(0.5f);
                 Vector256<float> sign = Vector256.Create(-0.0f); 
@@ -78,10 +80,16 @@ namespace NN01
 
             while(i < Size)
             {
-                Neurons[i] = Neurons[i].Swish(); 
+                outputData[i] = outputData[i].Swish(); 
                 i++;
             }
         }
+
+        public override void ReversedActivation(Layer next)
+        {
+            throw new NotImplementedException();
+        }
+
 
         public override void Derivate(Span<float> output)
         {
@@ -94,7 +102,7 @@ namespace NN01
             }
         }
 
-        public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
+        public override void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target)
         {
             int i = 0, j = 0;
 

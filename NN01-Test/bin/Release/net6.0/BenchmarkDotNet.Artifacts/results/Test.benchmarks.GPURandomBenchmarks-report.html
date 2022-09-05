@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Test.benchmarks.GPURandomBenchmarks-20220904-011646</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet=v0.13.1, OS=Windows 10.0.19044.1889 (21H2)
+Intel Core i9-9900K CPU 3.60GHz (Coffee Lake), 1 CPU, 16 logical and 8 physical cores
+.NET SDK=7.0.100-preview.5.22307.18
+  [Host]     : .NET 6.0.8 (6.0.822.36306), X64 RyuJIT
+  DefaultJob : .NET 6.0.8 (6.0.822.36306), X64 RyuJIT
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>                   Method</th><th>    Mean</th><th>  Error</th><th>  StdDev</th><th>  Median</th>
+</tr>
+</thead><tbody><tr><td>GPURandom1MxSingle</td><td>1.648 &mu;s</td><td>0.0182 &mu;s</td><td>0.0152 &mu;s</td><td>1.643 &mu;s</td>
+</tr><tr><td>GPURandom1000xSingleNormal</td><td>2.619 &mu;s</td><td>0.0523 &mu;s</td><td>0.0537 &mu;s</td><td>2.619 &mu;s</td>
+</tr><tr><td>GPURandom1000xSingleGaussian</td><td>4.524 &mu;s</td><td>0.2269 &mu;s</td><td>0.6174 &mu;s</td><td>4.681 &mu;s</td>
+</tr><tr><td>GPURandom1MxBlock</td><td>30,711.682 &mu;s</td><td>1,609.8979 &mu;s</td><td>4,721.5520 &mu;s</td><td>31,859.894 &mu;s</td>
+</tr><tr><td>GPURandom1000xBlockNormal</td><td>46,426.224 &mu;s</td><td>923.9546 &mu;s</td><td>1,568.9450 &mu;s</td><td>45,834.400 &mu;s</td>
+</tr><tr><td>GPURandom1000xBlockGaussian</td><td>77,321.317 &mu;s</td><td>1,828.9576 &mu;s</td><td>5,247.6223 &mu;s</td><td>77,627.518 &mu;s</td>
+</tr><tr><td>GPURandom1MxBlockSpan</td><td>29,669.698 &mu;s</td><td>1,001.2490 &mu;s</td><td>2,807.6096 &mu;s</td><td>30,434.791 &mu;s</td>
+</tr><tr><td>GPURandom1000xBlockSpanNormal</td><td>44,290.046 &mu;s</td><td>728.0281 &mu;s</td><td>680.9979 &mu;s</td><td>44,276.175 &mu;s</td>
+</tr><tr><td>GPURandom1000xBlockSpanGaussian</td><td>82,843.162 &mu;s</td><td>5,152.4410 &mu;s</td><td>15,192.0886 &mu;s</td><td>77,459.675 &mu;s</td>
+</tr><tr><td>CPURandom1MxSingle</td><td>4.199 &mu;s</td><td>0.0377 &mu;s</td><td>0.0352 &mu;s</td><td>4.190 &mu;s</td>
+</tr><tr><td>CPURandom1000xNormal</td><td>4.189 &mu;s</td><td>0.0380 &mu;s</td><td>0.0337 &mu;s</td><td>4.184 &mu;s</td>
+</tr><tr><td>CPURandom1000xGaussian</td><td>8.013 &mu;s</td><td>0.0755 &mu;s</td><td>0.0669 &mu;s</td><td>8.027 &mu;s</td>
+</tr><tr><td>CPURandom1MxBlock</td><td>75,744.265 &mu;s</td><td>791.2895 &mu;s</td><td>740.1727 &mu;s</td><td>75,739.243 &mu;s</td>
+</tr><tr><td>CPURandom1000xBlockNormal</td><td>230,497.260 &mu;s</td><td>2,167.4831 &mu;s</td><td>1,921.4173 &mu;s</td><td>230,264.267 &mu;s</td>
+</tr><tr><td>CPURandom1000xBlockGaussian</td><td>463,071.553 &mu;s</td><td>3,019.6801 &mu;s</td><td>2,824.6107 &mu;s</td><td>462,248.800 &mu;s</td>
+</tr></tbody></table>
+</body>
+</html>

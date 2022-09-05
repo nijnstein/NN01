@@ -1,4 +1,5 @@
 ﻿using NN01;
+using NSS;
 using System.Diagnostics;
 
 namespace UnitTests
@@ -58,7 +59,7 @@ namespace UnitTests
                 new int[] { 4, 16, 8, classCount },
                 new LayerActivationFunction[] {
                     LayerActivationFunction.ReLU,
-                    LayerActivationFunction.LeakyReLU,// Swish,
+                    LayerActivationFunction.LeakyReLU,
                     LayerActivationFunction.LeakyReLU,
                 }
             );
@@ -82,9 +83,9 @@ namespace UnitTests
             int stepsTrained = Trainer.Train
             (
                     nn,
-                    trainingPatterns,
+                    trainingPatterns.ConvertTo2D<float>(),
                     trainingClasses,
-                    testPatterns,
+                    testPatterns.ConvertTo2D<float>(),
                     testClasses
             );
 

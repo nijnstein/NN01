@@ -8,37 +8,56 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using ILGPU.Runtime;
+using NSS;
 
 namespace NN01
 {
     public class ReLuLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.ReLU;
-        public ReLuLayer(int size, int previousSize, Distribution weightInit = Distribution.Default, Distribution biasInit = Distribution.Default, bool skipInit = false)
+        public ReLuLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInit = false, IRandom random = null)
             : base
             (
                   size, 
                   previousSize, 
-                  weightInit == Distribution.Default ? Distribution.HeNormal : weightInit,
-                  biasInit == Distribution.Default ? Distribution.Random : biasInit,
-                  skipInit
+                  weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
+                  biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
+                  skipInit,
+                  random
             ) 
         { 
         }
 
-        public override void Activate(Layer previous)
+        public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
         {
             Span<float> values = stackalloc float[previous.Size]; 
 
             for (int j = 0; j < Size; j++)
             {
                 // compute sum of weights multiplied with input neurons then add bias
-                float value = Intrinsics.Sum(Intrinsics.Multiply(Weights[j], previous.Neurons, values)) + Biases[j]; 
+                float value = Intrinsics.Sum(Intrinsics.Multiply(Weights[j], inputData, values)) + Biases[j];
+
+                // relu 
+                outputData[j] = Math.Max(value, 0);
+            }
+        }
+
+        /// <summary>
+        /// activate current from next layer (reversed activation) 
+        /// </summary>
+        public override void ReversedActivation(Layer next)
+        {
+            Span<float> values = stackalloc float[next.Size];
+            
+            for (int j = 0; j < Size; j++)
+            {
+                float value = Intrinsics.Sum(Intrinsics.Multiply(next.Weights[j], next.Neurons, values)) - next.Biases[j];
 
                 // relu 
                 Neurons[j] = Math.Max(value, 0);
             }
         }
+
 
         /// <summary>
         /// get derivate of current activation state 
@@ -55,7 +74,7 @@ namespace NN01
             }
         }
 
-        public override void CalculateGamma(float[] delta, float[] gamma, float[] target)
+        public override void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target)
         {
             int i = 0, j = 0;
 

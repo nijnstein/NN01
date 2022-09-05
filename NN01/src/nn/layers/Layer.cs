@@ -1,5 +1,6 @@
 ﻿using ILGPU;
 using ILGPU.Runtime;
+using NSS;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,6 +18,8 @@ namespace NN01
     public abstract class Layer
     {
         public float[] Neurons;
+        public float[] Gamma;   // derivate(activation) 
+
         public float[][] Weights;
         public float[] Biases;
 
@@ -35,14 +38,15 @@ namespace NN01
         //
         //
         public LayerConnectedness Connectedness { get; set; } = LayerConnectedness.Full;
-        public Distribution WeightInitializer { get; set; } = Distribution.Random;
-        public Distribution BiasInitializer { get; set; } = Distribution.Random;
+        public LayerInitializationType WeightInitializer { get; set; } = LayerInitializationType.Random;
+        public LayerInitializationType BiasInitializer { get; set; } = LayerInitializationType.dot01;
 
-        public Layer(int size, int previousSize, Distribution weightInit = Distribution.Random, Distribution biasInit = Distribution.Random, bool skipInit = true)
+        public Layer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Random, LayerInitializationType biasInit = LayerInitializationType.Random, bool skipInit = true, IRandom random = null)
         {
             Size = size;
             PreviousSize = previousSize;
             Neurons = new float[size];
+            Gamma = new float[size]; // should not create on last.. 
 
             WeightInitializer = weightInit;
             BiasInitializer = biasInit;
@@ -52,7 +56,7 @@ namespace NN01
                 Biases = new float[size];
                 if (!skipInit)
                 {
-                    InitializeDistribution(BiasInitializer, Biases);
+                    InitializeDistribution(BiasInitializer, Biases, random);
                 }
 
                 Weights = (IsInput ? null : new float[size][])!;
@@ -61,7 +65,7 @@ namespace NN01
                     Weights![i] = new float[previousSize];
                     if (!skipInit)
                     {
-                        InitializeDistribution(WeightInitializer, Weights[i]);
+                        InitializeDistribution(WeightInitializer, Weights[i], random);
                     }
                 }
             }
@@ -74,51 +78,65 @@ namespace NN01
             }
         }
 
-        public abstract void Activate(Layer previous);
-        public abstract void CalculateGamma(float[] delta, float[] gamma, float[] target);
+        public void Activate(Layer previous)
+        {
+            Activate(previous, previous.Neurons, Neurons);
+        }
+
+        public abstract void Activate(Layer previous, Span<float> inputData, Span<float> outputData);
+        public abstract void ReversedActivation(Layer next);
+
+        /// <summary>
+        /// gamma == backward activation of neuron -> derivate(state) 
+        /// </summary>
+        /// <param name="delta"></param>
+        /// <param name="gamma"></param>
+        /// <param name="target"></param>
+        public abstract void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target);
         public abstract void Derivate(Span<float> output);
 
-        private void InitializeDistribution(Distribution initializer, float[] data)
+        private void InitializeDistribution(LayerInitializationType initializer, float[] data, IRandom random)
         {
             switch (initializer)
             {
-                case Distribution.Zeros: for (int i = 0; i < data.Length; i++) data[i] = 0; break;
-                case Distribution.Ones: for (int i = 0; i < data.Length; i++) data[i] = 1; break;
+                case LayerInitializationType.dot01: for (int i = 0; i < data.Length; i++) data[i] = 0.01f; break;
+                case LayerInitializationType.Zeros: for (int i = 0; i < data.Length; i++) data[i] = 0; break;
+                case LayerInitializationType.Ones: for (int i = 0; i < data.Length; i++) data[i] = 1; break;
 
                 default:
-                case Distribution.Random:
+                case LayerInitializationType.Random:
                     {
                         for (int i = 0; i < data.Length; i++)
                         {
-                            data[i] = Random.Shared.NextSingle() - 0.5f;
+                            data[i] = (Random.Shared.NextSingle() - 0.5f) * 0.1f;
                         }
                     }
                     break;
 
-                case Distribution.Normal:
+                case LayerInitializationType.Normal:
                     {
                         for (int i = 0; i < data.Length; i++)
                         {
-                            data[i] = Random.Shared.Normal(0, 1);
+                            data[i] = Random.Shared.Normal(0,  .1f);
                         }
                     }
                     break;
 
-                case Distribution.Gaussian:
+                case LayerInitializationType.Gaussian:
                     {
                         for (int i = 0; i < data.Length; i++)
                         {
-                            data[i] = Random.Shared.Gaussian(0, 1);
+                            data[i] = Random.Shared.Gaussian(0, .1f);
                         }
                     }
                     break;
 
-                case Distribution.HeNormal:
+                case LayerInitializationType.HeNormal:
                     {
                         if (PreviousSize == 0)
                         {
                             // reduce to random 
-                            goto case Distribution.Normal;
+                            goto case LayerInitializationType.Normal;
                         }
                         else
                         {
@@ -136,7 +154,7 @@ namespace NN01
                     }
                     break;
 
-                case Distribution.Uniform:
+                case LayerInitializationType.Uniform:
                     {
                         MathEx.Uniform(data, 1f);
                     }
@@ -144,7 +162,7 @@ namespace NN01
             }
         }
 
-        private void InitializeDeltaBuffers()
+        public void InitializeDeltaBuffers()
         {
             if (!IsInput)
             {
@@ -245,6 +263,7 @@ namespace NN01
                                 Avx.Add(
                                     Avx.Add(d, Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
                                     // strengthen learned weights
+//                                    Avx.Multiply(wRate, Avx.Multiply(g, Avx.Multiply(wCost, w[jj])))
                                     Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost, w[jj])))
                                 ));
 
@@ -267,7 +286,8 @@ namespace NN01
                             // momentum 
                             + (WeightDeltas![i][j] * momentum)
                             // strengthen learned weights
-                            + (weightLearningRate * (gamma[i] - weightCost * Weights[i][j]));
+//                            + (weightLearningRate * (gamma[i] * weightCost * Weights[i][j]));  
+                              + (weightLearningRate * (gamma[i] - weightCost * Weights[i][j]));  
 
                         WeightDeltas[i][j] = delta;
 
