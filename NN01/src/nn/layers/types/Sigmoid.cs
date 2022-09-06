@@ -12,13 +12,14 @@ namespace NN01
     public class SigmoidLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Sigmoid;
-        public SigmoidLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInit = false, IRandom random = null)
+        public SigmoidLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
             : base
             (
                   size,
                   previousSize,
                   weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
                   biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
+                  softmax,
                   skipInit, 
                   random
             )
@@ -32,7 +33,7 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += Weights[j][k] * inputData[k];
+                    value += Weights[j, k] * inputData[k];
                 }
 
                 // apply bias

@@ -22,7 +22,7 @@ namespace NN01
             /// <summary>
             /// training population 
             /// </summary>
-            public int Population { get; set; } = 100;
+            public int Population { get; set; } = 32;
 
             /// <summary>
             /// learning rate
@@ -31,8 +31,12 @@ namespace NN01
 
             /// <summary>
             /// chance of a single neurons weight to change
+            /// - this is not a percentage and heavily depends on the random distribution used, if the random is higher it mutates
             /// </summary>
-            public float MutationChance { get; set; } = 0.05f;
+            public float MutationChance { get; set; } = .27f;
+
+            public float MaximalMutationChance { get; set; } = .85f;
+            public float MinimalMutationChance { get; set; } = .05f;
 
             /// <summary>
             /// strenght of any mutation if it occurs 
@@ -86,12 +90,24 @@ namespace NN01
 
             public int MiniBatchSize { get; set; } = 0;
 
-            public bool OneByOne { get; set; } = true;
+            public int BatchedStartSteps { get; set; } = 0;
+
+            /// <summary>
+            /// - if true, performs online training (sample after sample
+            /// - if false, perform batch training 
+            /// </summary>
+            public bool OnlineTraining { get; set; } = true;
+
+            public bool SoftMax { get; set; } = false;
 
             /// <summary>
             /// if enabled uses the power of the gpu 
             /// </summary>                           
             public bool GPU { get; set; } = false;
+
+            public bool RandomGPU { get; set; } = true;
+
+            public IRandom? Random { get; set; }
 
             /// <summary>
             /// a default ready estimation: stop training if fitness or cost reaches some threshold 
@@ -123,7 +139,7 @@ namespace NN01
                 return float.NaN; 
             };
 
-            public delegate void OnStepEvent(NeuralNetwork network, int step); 
+            public delegate void OnStepEvent(NeuralNetwork network, int step, bool batched, float populationError, float totalMilliseconds, int mutationCount); 
             public OnStepEvent OnStep = null;
 
 

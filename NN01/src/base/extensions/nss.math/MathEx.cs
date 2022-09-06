@@ -72,53 +72,6 @@ namespace NSS
             return Exp(a, a);
         }
 
-        public static void Softmax(this Span<float> input, Span<float> output, bool stable = false)
-        {
-            // softmax == each exponent of every component divided by the sum of of all exponents 
-            if (stable)
-            {
-                // stable done in other function,
-                // - dont want inner loop branches
-                // - dont want to modify input 
-                // - dont want unneccessary memory operations on ALL non stable stofmax calls
-                SoftmaxStable(input, output);
-            }
-            else
-            {
-                float summed = 0;
-                for (int i = 0; i < input.Length; i++)
-                {
-                    float ex = MathF.Exp(input[i]);
-                    summed += ex;
-                    output[i] = ex;
-                }
-                for (int i = 0; i < input.Length; i++)
-                {
-                    output[i] = output[i] / summed;
-                }
-            }
-        }
-
-        /// <summary>
-        /// stabelized softmax, max(input) is used to pull data into the negative in a reduced spread allowing exponentiation towards zero instead of infinity on large input values
-        /// </summary>
-        public static void SoftmaxStable(Span<float> input, Span<float> output)
-        {
-            float summed = 0;
-            float max = Max(input); 
-
-            for (int i = 0; i < input.Length; i++)
-            {
-                float ex = MathF.Exp(input[i]) - max;
-                summed += ex;
-                output[i] = ex;
-            }
-            for (int i = 0; i < input.Length; i++)
-            {
-                output[i] = output[i] / summed;
-            }
-        }
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float CDFNormal(this float x, float mean, float sd)
@@ -131,7 +84,7 @@ namespace NSS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Normal(this Random random, float mean, float sd) => random.NextSingle().CDFNormal(mean, sd);
-
+ 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Gaussian(this Random random, float mean, float sd)
@@ -433,6 +386,10 @@ namespace NSS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Range(this Random random, float low, float high) => random.NextSingle() * (high - low) + low;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Range(this IRandom random, float low, float high) => random.NextSingle() * (high - low) + low;
+
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

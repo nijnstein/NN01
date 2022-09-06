@@ -45,6 +45,7 @@ namespace NSS.GPU
                 };
             }
         }
+                
 
         public Context? Context { get; set; }
         public Device? Device { get; set; }
@@ -60,6 +61,14 @@ namespace NSS.GPU
             }
             Device = null;
             Context = null;                 
+        }
+
+        public static string GetDefaultDeviceDescription()
+        {
+            using (Context ctx = Context.CreateDefault())
+            {
+                return ctx.GetPreferredDevice(false).ToString(); 
+            }
         }
     }   
 }

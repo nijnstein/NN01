@@ -12,13 +12,14 @@ namespace NN01
     public class BinaryLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Binary;
-        public BinaryLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInit = false, IRandom random = null)
+        public BinaryLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
             : base
             (
                   size,
                   previousSize,
                   weightInit == LayerInitializationType.Default ? LayerInitializationType.Normal : weightInit,
                   biasInit == LayerInitializationType.Default ? LayerInitializationType.Random : biasInit,
+                  softmax,
                   skipInit, 
                   random
             )
@@ -31,7 +32,7 @@ namespace NN01
                 float value = 0f;
                 for (int k = 0; k < previous.Size; k++)
                 {
-                    value += Weights[j][k] * inputData[k];
+                    value += Weights[j, k] * inputData[k];
                 }
 
                 value += Biases[j];

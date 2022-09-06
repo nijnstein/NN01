@@ -22,134 +22,157 @@ namespace UnitTests
         string[] trainingDataSets = new string[] {
             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train0.jpg",
             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train1.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train2.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train3.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train4.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train5.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train6.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train7.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train8.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_train9.jpg",
+ //            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train2.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train3.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train4.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train5.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train6.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train7.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train8.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train9.jpg",
         };
 
         string[] testDataSets = new string[] {
             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test0.jpg",
             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test1.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test2.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test3.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test4.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test5.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test6.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test7.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test8.jpg",
- //           "C:\\Repo\\NN01\\NN01\\Handwritten Digit Samples\\mnist_test9.jpg",
-        }; 
+ //             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test2.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test3.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test4.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test5.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test6.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test7.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test8.jpg",
+ //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test9.jpg",
+        };
 
         public void Run(int steps = 100, bool allowGPU = true)
         {
+            Trainer.Settings settings = new Trainer.Settings();
+            settings.Population = 64;
+            settings.Steps = steps;
+            settings.GPU = allowGPU && GPUContext.HaveGPUAcceleration;
+            settings.MiniBatchSize = 0;
+            settings.LearningRate = 0.01f;
+            settings.OnlineTraining = true;
+            settings.BatchedStartSteps = 15;
+            settings.SoftMax = false; 
+
             NeuralNetwork nn = new NeuralNetwork(
               new int[]
               {
                   patternSize,
-                  28 * 14,
+                  28 * 28 * 2,
                   32,
-                  ClassCount
+                  ClassCount, // leReLU
               },
               new LayerActivationFunction[] {
                     LayerActivationFunction.ReLU,
                     LayerActivationFunction.Tanh,//Swish, // .Tanh,
-                    LayerActivationFunction.LeakyReLU,
-              }
+                    //LayerActivationFunction.Sigmoid
+                     LayerActivationFunction.LeakyReLU
+              },
+              settings.SoftMax
             );
 
-            int sampleCountPerClass = 256;
-            int testCountPerClass = 16;
+            int totalParameterCount = nn.CalculateTotalParameterCount();
+            int sampleCountPerClass = 2048 * 2;
+            int testCountPerClass = 128;
 
-            Trainer.Settings settings = new Trainer.Settings();
-            settings.Population = 48;
-            settings.Steps = steps;
-            settings.GPU = allowGPU && GPUContext.HaveGPUAcceleration;
-            settings.MiniBatchSize = 0;
-            settings.LearningRate = 0.05f;
-            settings.OneByOne = false;
             settings.ReadyEstimator = (nn) =>
             {
-                return  (nn.Cost < 0.001f && nn.Cost != 0);
+                return (nn.Cost < 0.00001f && nn.Cost != 0);
             };
+            
             settings.FitnessEstimator = (network, samples) =>
             {
                 return 1 - Math.Min(0.999999f, network.Cost);
             };
-            settings.OnStep = (NeuralNetwork network, int step) => Console.WriteLine($"> Step: {(step.ToString().PadRight(10))} Cost: {(network.Cost.ToString("0.00000").PadRight(10))} Fitness:  {(network.Fitness.ToString("0.00000").PadRight(10))}");
-
+            
+            settings.OnStep = (NeuralNetwork network, int step, bool batched, float populationError, float ms, int mutationCount) =>
+            {
+                if (step == 0)
+                {
+                    Console.WriteLine($"> Step     Trainingmode       Population Fittness        Lowest Cost      Best Fit         Mutations    %of Population      Steptime     ");
+                    Console.WriteLine($"> --------------------------------------------------------------------------------------------------------------------------------------");
+                }
+                float mp = (100f / totalParameterCount) * ((float)mutationCount / (float)settings.Population);
+                Console.WriteLine($"> {(step.ToString().PadRight(8))} {(batched ? "batched      " : "online       ")}      {populationError.ToString("0.00000").PadRight(25)}  {(network.Cost.ToString("0.00000").PadRight(15))}  {(network.Fitness.ToString("0.00000").PadRight(15))}  {mutationCount.ToString().PadRight(12)} {mp.ToString("0.00").PadRight(15)}   {ms.ToString("0.000")}ms");
+            };
 
             Console.WriteLine($" Initializing network");
             Console.WriteLine("");
             Console.WriteLine($">          Structure: {nn.ToString()}");
             Console.WriteLine($">         Input Size: {nn.Input.Size.ToString()}");
-            Console.WriteLine($">        Class Count: {nn.Output.Size.ToString()}");
             Console.WriteLine($">         Population: {settings.Population}");
+            Console.WriteLine($">        Class Count: {nn.Output.Size.ToString()}");
+            Console.WriteLine($">    Parameter Count: {totalParameterCount.ToString()}");
             Console.WriteLine($">              Steps: {settings.Steps}");
-            if(settings.GPU)
+            Console.WriteLine($">      Training mode: {(settings.OnlineTraining ? "online" : "batched")}");
+            Console.WriteLine($">        Batch start: {(settings.BatchedStartSteps > 0 ? $"batching until step {settings.BatchedStartSteps}" : "no")}");
+            if (settings.GPU)
             {
-                Console.WriteLine($">                GPU: {"enabled"}");
+                Console.WriteLine($">                GPU: {GPUContext.GetDefaultDeviceDescription()}");
+            }
+            else
+            {
+                Console.WriteLine($">                CPU: Multithreaded {Environment.ProcessorCount} cores");
             }
             Console.WriteLine("");
 
             // train for given patterns 
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            Console.WriteLine("> Loading samples: ");
+            Console.Write("> Loading sample data: ");
 
             int currentIndex = 0;
             int testIndex = 0;
 
             SampleSet trainingSet = new SampleSet(28 * 28, sampleCountPerClass * ClassCount, ClassCount);
-            for (int i = 0; i < ClassCount; i++)
-            {
-                Console.Write($"> {Path.GetFileName(trainingDataSets[i])} ");
-          
-                currentIndex = trainingSet.LoadDigitGrid(currentIndex, trainingDataSets[i], i + 1, 28, 28, sampleCountPerClass);
-            }
-            Console.WriteLine();
-            Console.WriteLine();
-            Console.WriteLine($" loaded {currentIndex} training samples");
-            Console.WriteLine();
-
             SampleSet testSet = new SampleSet(28 * 28, testCountPerClass * ClassCount, ClassCount);
             for (int i = 0; i < ClassCount; i++)
             {
+                Console.Write($"> {Path.GetFileName(trainingDataSets[i])} ");
+                currentIndex = trainingSet.LoadDigitGrid(currentIndex, trainingDataSets[i], i + 1, 28, 28, sampleCountPerClass);
                 Console.Write($"> {Path.GetFileName(testDataSets[i])} ");
-                testIndex = testSet.LoadDigitGrid(testIndex, testDataSets[i], i + 1, 28, 28, testCountPerClass); 
+                testIndex = testSet.LoadDigitGrid(testIndex, testDataSets[i], i + 1, 28, 28, testCountPerClass);
             }
             Console.WriteLine();
             Console.WriteLine();
-            Console.WriteLine($" loaded {testIndex} test samples");
-            Console.WriteLine();
-
-            trainingSet.Prepare(); 
-            testSet.Prepare(); 
-
             sw.Stop();
-            Console.WriteLine($"> Data ready in: {sw.Elapsed.TotalMilliseconds.ToString("0.000")}ms");
-            Console.WriteLine();
+            trainingSet.Prepare(false);  //  settings.SoftMax);
+            testSet.Prepare(false); // settings.SoftMax);
+
+            Console.WriteLine($" loaded {currentIndex} training and {testIndex} test samples in {sw.Elapsed.TotalMilliseconds.ToString("0.000")}ms");
             DisplaySample(trainingSet.probabilityIndex, 28, ConsoleColor.Yellow);
-            Console.WriteLine();
 
 
-            Console.WriteLine("\n> Starting training..");
+            Console.WriteLine("\n> Starting training.. [Q] to stop");
             sw.Reset();
-            sw.Start(); 
+            sw.Start();
 
-            int stepsTrained = Trainer.Train
-            (
-                nn,
-                trainingSet,
-                testSet,
-                settings
-            );
+            int stepsTrained = 0;
+            CancellationTokenSource canceller = new CancellationTokenSource();
 
-            sw.Stop();
+            //Task task = Task.Factory.StartNew(() => {
+                stepsTrained = Trainer.Train
+                (
+                    nn,
+                    trainingSet,
+                    testSet,
+                    settings
+                ); 
+            //}, canceller.Token, TaskCreationOptions.None, PriorityScheduler.BelowNormal);
+
+ //           while(!task.IsCompleted && !task.IsCanceled)
+ //           {
+ //               task.Wait(10000, canceller.Token);
+ //               if(Console.KeyAvailable && Console.ReadKey().Key == ConsoleKey.Q)
+ //               {
+ //                   canceller.Cancel(); 
+ //               }
+ //               Console.Write('.'); 
+ //           }
+            Console.WriteLine(); 
 
             Console.WriteLine($"Training Completed:");
             Console.WriteLine("");

@@ -103,6 +103,19 @@ namespace NSS.GPU
                     gpuProvider.Return(lease);
                 }
                 lease = gpuProvider.Lease(true);
+
+                int spin = 0;
+                while (lease == null && spin < 10)
+                {
+                    lease = gpuProvider.Lease(true);
+                    spin++;
+                    Thread.Sleep(spin * 10);
+                }
+                if(lease == null)
+                {
+                    throw new Exception("failed to get a lease on random buffer, all leases taken");
+                }
+
                 cursor = lease!.chunk.dirtyCursor;
                 currentBuffer = lease!.chunk.data;
             }

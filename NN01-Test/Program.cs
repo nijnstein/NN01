@@ -41,9 +41,11 @@ namespace UnitTests
                    //   new Pattern64().Run();
 
                     Console.WriteLine("");
-                    Console.WriteLine("");
+                    Console.Write("Use GPU? [Y/N]");
 
-                    new Digit_ocr().Run(50);
+                    bool gpu = Console.ReadKey().Key == ConsoleKey.Y;
+
+                    new Digit_ocr().Run(25, gpu);
 
 
 

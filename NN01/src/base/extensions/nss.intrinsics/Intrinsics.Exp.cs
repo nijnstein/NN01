@@ -177,6 +177,7 @@ namespace NSS
         /// <summary>
         /// output = Exp(a)
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Span<float> Exp(Span<float> a, Span<float> output)
         {
             int i = 0;
