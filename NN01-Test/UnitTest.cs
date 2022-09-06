@@ -12,6 +12,19 @@ namespace UnitTests
     [TestFixture]
     public class UnitTest
     {
+
+        [TestCase()]
+        public void Span2D_1()
+        {
+            var data = new float[2, 2] { { 1, 2 }, { 3, 4 } };
+            Span2D<float> s = data.AsSpan2D<float>();
+            Assert.IsTrue(s.Column(0)[0] == 1f);
+            Assert.IsTrue(s.Column(0)[1] == 3f);
+            Assert.IsTrue(s.Column(1)[0] == 2f);
+            Assert.IsTrue(s.Column(1)[1] == 4f);
+            //Assert.IsTrue(s.Column(1).Sum() == 6f);
+        }
+
         [TestCase(new float[] { 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 87, 4, 5 }, 87)]
         [TestCase(new float[] { 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 12.5f, 12.1f, 1f, 0f, 1, 3, 4, 5, 6, 7, 87, 4, 5, 1001 }, 1001)]
         public void Intrinsics_Max(float[] a, float m)

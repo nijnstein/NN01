@@ -37,7 +37,7 @@ namespace NN01
                 {
                     for (int j = 0; j < layer.PreviousSize; j++)
                     {
-                        layer.Weights[i][j] = r.ReadSingle();
+                        layer.Weights[i,j] = r.ReadSingle();
                     }
                 }
             }

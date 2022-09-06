@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+﻿using ILGPU;
+using ILGPU.Runtime;
+using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
 
 namespace NSS.Neural
@@ -15,7 +17,10 @@ namespace NSS.Neural
         private float[,] actual; 
         private int[] indexTable;
         public float[] probabilityIndex;
-        public float[] sampleError; 
+        public float[] sampleError;
+
+        public float Variance;
+        public float Average;
 
         public Sample[] Samples => samples;
         public float[,] Data => data;
@@ -49,7 +54,7 @@ namespace NSS.Neural
             IsPrepared = false; 
         }
 
-        public SampleSet(float[,] patterns, int[] classes, int classCount)
+        public SampleSet(float[,] patterns, int[] classes, int classCount, bool softmax)
         {
             Debug.Assert(patterns != null && classes != null);
 
@@ -71,12 +76,12 @@ namespace NSS.Neural
                 samples[i] = new Sample(i, SampleSize, classes[i], ClassCount);
             }
 
-            Prepare();
+            Prepare(softmax);
         }
 
-        public void Prepare()
+        public void Prepare(bool softmax)
         { 
-            GenerateExpectations();
+            GenerateExpectations(softmax);
             //CancelMeans();
             GenerateIndexArray();
 
@@ -84,15 +89,23 @@ namespace NSS.Neural
             actual.Zero(); 
 
             probabilityIndex = GetProbabilityIndex();
+            Average = data.AsSpan<float>().Average();
+            Variance = data.AsSpan<float>().Variance(Average);
             IsPrepared = true;     
         }
 
 
-        public void GenerateExpectations()
+        public void GenerateExpectations(bool softmax)
         { 
             for (int i = 0; i < SampleCount; i++)
             {
-                GenerateExpectation(i, expectation.AsSpan2D<float>().Row(i));
+                Span<float> e = expectation.AsSpan2D<float>().Row(i); 
+                GenerateExpectation(i, e);
+                if (softmax)
+                {
+                    // softmax has NO use if we use it on a ONE hot encoded expectation 
+                    MathEx.Softmax(e, e, true);
+                }
             }
         }
 
@@ -258,6 +271,31 @@ namespace NSS.Neural
         public Span<float> ShuffledActual(int sampleIndex) => actual.AsSpan2D<float>().Row(indexTable[sampleIndex]);
  
         public Span<float> SampleActual(int sampleIndex) => actual.AsSpan2D<float>().Row(sampleIndex);
+
+
+        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_data = null;
+        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_expectation = null;
+        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_actual = null;
+        internal MemoryBuffer1D<float, Stride1D.Dense> gpu_sampleErrors = null;
+        public bool IsGPUMemoryAllocated { get; protected set; } = false; 
+
+        public void AllocateGPU(Accelerator acc)
+        {
+            gpu_data = acc.Allocate2DDenseX<float>(Data);
+            gpu_expectation = acc.Allocate2DDenseX<float>(Expectation);
+            gpu_sampleErrors = acc.Allocate1D<float>(SampleCount);
+            gpu_actual = acc.Allocate2DDenseX<float>(Actual);
+            acc.Synchronize(); 
+        }
+
+        public void ReleaseGPU(Accelerator acc)
+        {
+            gpu_data.Dispose();
+            gpu_expectation.Dispose();
+            gpu_sampleErrors.Dispose();
+            gpu_actual.Dispose(); 
+        }
+
 
     }
 }

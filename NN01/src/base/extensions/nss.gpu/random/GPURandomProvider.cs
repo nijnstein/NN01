@@ -174,106 +174,108 @@ namespace NSS.GPU
                         if (dirtyQueue.Count > 0)
                         {
                             RandomProviderChunk dirty = dirtyQueue.Dequeue();
-
-                            switch (DistributionInfo.ProviderBackend)
+                            if (dirty != null)
                             {
-                                case RandomProviderBackend.XorShift128Plus:
-                                    {
-                                        using (var rng1 = RNG.Create<XorShift128Plus>(accelerator, new Random(currentSeed)))
+                                switch (DistributionInfo.ProviderBackend)
+                                {
+                                    case RandomProviderBackend.XorShift128Plus:
                                         {
-                                            rng1.FillUniform(gpuMemory.View);
+                                            using (var rng1 = RNG.Create<XorShift128Plus>(accelerator, new Random(currentSeed)))
+                                            {
+                                                rng1.FillUniform(gpuMemory.View);
+                                            }
                                         }
-                                    }
-                                    break;
+                                        break;
 
-                                case RandomProviderBackend.XorShift128:
-                                    {
-                                        using (var rng1 = RNG.Create<XorShift128>(accelerator, new Random(currentSeed)))
+                                    case RandomProviderBackend.XorShift128:
                                         {
-                                            rng1.FillUniform(gpuMemory.View);
+                                            using (var rng1 = RNG.Create<XorShift128>(accelerator, new Random(currentSeed)))
+                                            {
+                                                rng1.FillUniform(gpuMemory.View);
+                                            }
                                         }
-                                    }
-                                    break;
+                                        break;
 
-                                case RandomProviderBackend.XorShift64star:
-                                    {
-                                        using (var rng1 = RNG.Create<XorShift64Star>(accelerator, new Random(currentSeed)))
+                                    case RandomProviderBackend.XorShift64star:
                                         {
-                                            rng1.FillUniform(gpuMemory.View);
+                                            using (var rng1 = RNG.Create<XorShift64Star>(accelerator, new Random(currentSeed)))
+                                            {
+                                                rng1.FillUniform(gpuMemory.View);
+                                            }
                                         }
-                                    }
-                                    break;
+                                        break;
 
-                                case RandomProviderBackend.XorShift32:
-                                    {
-                                        using (var rng1 = RNG.Create<XorShift32>(accelerator, new Random(currentSeed)))
+                                    case RandomProviderBackend.XorShift32:
                                         {
-                                            rng1.FillUniform(gpuMemory.View);
+                                            using (var rng1 = RNG.Create<XorShift32>(accelerator, new Random(currentSeed)))
+                                            {
+                                                rng1.FillUniform(gpuMemory.View);
+                                            }
                                         }
-                                    }
-                                    break;
-                            }
+                                        break;
+                                }
 
-                            switch (DistributionInfo.DistributionType)
-                            {
-                                case RandomDistributionType.Uniform:
-                                    {
-                                        // we may need to scale the default uniform 
-                                        if (DistributionInfo.P1 != 0f | DistributionInfo.P2 != 1f)
+                                switch (DistributionInfo.DistributionType)
+                                {
+                                    case RandomDistributionType.Uniform:
                                         {
-                                            float mean = (DistributionInfo.P1 + DistributionInfo.P2) / 2;
-                                            float scale = (DistributionInfo.P2 - DistributionInfo.P1) / 2;
+                                            // we may need to scale the default uniform 
+                                            if (DistributionInfo.P1 != 0f | DistributionInfo.P2 != 1f)
+                                            {
+                                                float mean = (DistributionInfo.P1 + DistributionInfo.P2) / 2;
+                                                float scale = (DistributionInfo.P2 - DistributionInfo.P1) / 2;
+                                                accelerator!.LaunchAutoGrouped<Index1D, ArrayView<float>, float, float>(
+                                                    UniformKernel, chunkSize, gpuMemory.View, scale, mean);
+                                            }
+                                        }
+                                        break;
+
+                                    case RandomDistributionType.Gaussian:
+                                        {
                                             accelerator!.LaunchAutoGrouped<Index1D, ArrayView<float>, float, float>(
-                                                UniformKernel, chunkSize, gpuMemory.View, scale, mean);
+                                                    GaussianGPUKernel, chunkSize, gpuMemory.View, DistributionInfo.P1, DistributionInfo.P2);
                                         }
-                                    }
-                                    break;
+                                        break;
 
-                                case RandomDistributionType.Gaussian:
-                                    {
-                                        accelerator!.LaunchAutoGrouped<Index1D, ArrayView<float>, float, float>(
-                                                GaussianGPUKernel, chunkSize, gpuMemory.View, DistributionInfo.P1, DistributionInfo.P2);
-                                    }
-                                    break;
+                                    case RandomDistributionType.Normal:
+                                        {
+                                            accelerator!.LaunchAutoGrouped<Index1D, ArrayView<float>, float, float>(
+                                                    NormalGPUKernel, chunkSize, gpuMemory.View, DistributionInfo.P1, DistributionInfo.P2);
+                                        }
+                                        break;
 
-                                case RandomDistributionType.Normal:
-                                    {
-                                        accelerator!.LaunchAutoGrouped<Index1D, ArrayView<float>, float, float>(
-                                                NormalGPUKernel, chunkSize, gpuMemory.View, DistributionInfo.P1, DistributionInfo.P2);
-                                    }
-                                    break;
+                                    case RandomDistributionType.HeNormal:
+                                        {
+                                            accelerator!.LaunchAutoGrouped<Index1D, ArrayView<float>, float, float, float>(
+                                                    HeNormalGPUKernel, chunkSize, gpuMemory.View, DistributionInfo.P1, DistributionInfo.P2, DistributionInfo.P3);
+                                        }
+                                        break;
 
-                                case RandomDistributionType.HeNormal:
-                                    {
-                                        accelerator!.LaunchAutoGrouped<Index1D, ArrayView<float>, float, float, float>(
-                                                HeNormalGPUKernel, chunkSize, gpuMemory.View, DistributionInfo.P1, DistributionInfo.P2, DistributionInfo.P3);
-                                    }
-                                    break;
-
-                                default: throw new NotImplementedException();
-                            }
-
-                            if (synchronizeAndCopy)
-                            {
-                                // sync any running task on the gpu 
-                                accelerator.Synchronize();
-
-                                // copy the random numbers from gpu to our cpu data
-                                // TODO -> a random class only supporting blocks of random numbers could eliminate this copy
-                                if (DistributionInfo.RandomInputCount > 1)
-                                {
-                                    gpuMemory.View.SubView(0, chunkSize).CopyToCPU(accelerator!.DefaultStream, dirty.data);
+                                    default: throw new NotImplementedException();
                                 }
-                                else
-                                {
-                                    gpuMemory.View.CopyToCPU(accelerator!.DefaultStream, dirty.data);
-                                }
-                            }
 
-                            // unflag dirty and rebase the current seed 
-                            dirty.dirty = false;
-                            dirty.dirtyCursor = 0;
-                            currentSeed = (int)(dirty.data[0] * 10000000f);
+                                if (synchronizeAndCopy)
+                                {
+                                    // sync any running task on the gpu 
+                                    accelerator.Synchronize();
+
+                                    // copy the random numbers from gpu to our cpu data
+                                    // TODO -> a random class only supporting blocks of random numbers could eliminate this copy
+                                    if (DistributionInfo.RandomInputCount > 1)
+                                    {
+                                        gpuMemory.View.SubView(0, chunkSize).CopyToCPU(accelerator!.DefaultStream, dirty.data);
+                                    }
+                                    else
+                                    {
+                                        gpuMemory.View.CopyToCPU(accelerator!.DefaultStream, dirty.data);
+                                    }
+                                }
+
+                                // unflag dirty and rebase the current seed 
+                                dirty.dirty = false;
+                                dirty.dirtyCursor = 0;
+                                currentSeed = (int)(dirty.data[0] * 10000000f);
+                            }
                         }
                     }
                     if (!all)
@@ -302,30 +304,33 @@ namespace NSS.GPU
             bool enqueued_dirty = false;
             bool have_dirty = false;
 
-            for (int i = 0; i < chunks.Length; i++)
+            lock (locker)
             {
-                RandomProviderChunk c = chunks[i];
-
-                if ((!c.dirty) & (!c.leased))
+                for (int i = 0; i < chunks.Length; i++)
                 {
-                    if (length <= (chunkSize - c.dirtyCursor))
-                    {
-                        // take the span 
-                        span = c.data.AsSpan(c.dirtyCursor, length);
+                    RandomProviderChunk c = chunks[i];
 
-                        // mark as dirty 
-                        c.dirtyCursor += length;
-                        return true;
-                    }
-                    else
+                    if ((!c.dirty) & (!c.leased))
                     {
-                        enqueued_dirty = true;
-                        c.dirty = true;
-                        dirtyQueue.Enqueue(c);
+                        if (length <= (chunkSize - c.dirtyCursor))
+                        {
+                            // take the span 
+                            span = c.data.AsSpan(c.dirtyCursor, length);
+
+                            // mark as dirty 
+                            c.dirtyCursor += length;
+                            return true;
+                        }
+                        else
+                        {
+                            enqueued_dirty = true;
+                            c.dirty = true;
+                            dirtyQueue.Enqueue(c);
+                        }
                     }
+
+                    have_dirty = have_dirty | c.dirty;
                 }
-
-                have_dirty = have_dirty | c.dirty;
             }
 
             if (enqueued_dirty)

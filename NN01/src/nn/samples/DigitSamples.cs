@@ -33,7 +33,7 @@ namespace NN01
                         {
                             for (int ix = x * w; ix < x * w + w; ix++)
                             {
-                                sampleData[j++] = bmp.GetPixel(ix, iy).GetBrightness(); // mm performance will be great....
+                                sampleData[j++] = bmp.GetPixel(ix, iy).GetBrightness();  
                             }
                         }
 

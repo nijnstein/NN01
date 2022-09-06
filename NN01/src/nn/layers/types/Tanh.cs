@@ -15,13 +15,14 @@ namespace NN01
     public class TanhLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Tanh;
-        public TanhLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInit = false, IRandom random = null)
+        public TanhLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
             : base
             (
                   size,
                   previousSize,
                   weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
                   biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
+                  softmax,
                   skipInit, 
                   random
             )
@@ -29,10 +30,11 @@ namespace NN01
         }
         public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
         {
+            Span2D<float> w = Weights.AsSpan2D<float>();
+
             for (int j = 0; j < Size; j++)
             {
-                float value = Intrinsics.SumWeighted(Weights[j], inputData) + Biases[j];
-
+                float value = Intrinsics.SumWeighted(w.Row(j), inputData) + Biases[j];
                 if (Avx.IsSupported)
                 {
                     outputData[j] = value;
@@ -86,9 +88,29 @@ namespace NN01
             Debug.Assert(output != null);
             Debug.Assert(output.Length == input.Length);
 
-            for (int j = 0; j < Size; j++)
+            //for (int j = 0; j < Size; j++)
+            //{
+            //    output[j] = ActivationFunctions.TanhFastDerivative(input[j]);
+            //}
+
+            int i = 0, j = 0;
+            if (Avx.IsSupported)
             {
-                output[j] = ActivationFunctions.TanhFastDerivative(input[j]);
+                Vector256<float> a10 = Vector256.Create(1f);
+                Span<Vector256<float>> ii = MemoryMarshal.Cast<float, Vector256<float>>(input);
+                Span<Vector256<float>> oo = MemoryMarshal.Cast<float, Vector256<float>>(output);
+
+                while (i < (Size & ~7))
+                {
+                    oo[j] = Avx.Subtract(a10, Avx.Multiply(ii[j], ii[j]));
+                    i += 8;
+                    j++;
+                }
+            }
+            while (i < Size)
+            {
+                output[i] = (1 - input[i] * input[i]);
+                i++;
             }
         }
 

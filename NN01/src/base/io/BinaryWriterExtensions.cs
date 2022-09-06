@@ -34,7 +34,7 @@ namespace NN01
                 {
                     for (int j = 0; j < layer.PreviousSize; j++)
                     {
-                        w.Write(layer.Weights[i][j]);
+                        w.Write(layer.Weights[i,j]);
                     }
                 }
             }

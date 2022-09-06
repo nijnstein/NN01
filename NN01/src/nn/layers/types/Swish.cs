@@ -15,13 +15,14 @@ namespace NN01
     public class SwishLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Swish;
-        public SwishLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool skipInit = false, IRandom random = null)
+        public SwishLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
             : base
             (
                   size,
                   previousSize,
                   weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
                   biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
+                  softmax,
                   skipInit, 
                   random
             )
@@ -31,12 +32,13 @@ namespace NN01
         public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
         {
             Span<float> buffer = stackalloc float[previous.Size];
- 
+            Span2D<float> w = Weights.AsSpan2D<float>();
+
             int j;  
             for (j = 0; j < Size; j++)
             {
                 // compute sum of weights multiplied with input neurons then add bias
-                float value = Intrinsics.SumWeighted(Weights[j], inputData) + Biases[j];
+                float value = Intrinsics.SumWeighted(w.Row(j), inputData) + Biases[j];
                 outputData[j] = value; // .Swish();
             }
 
