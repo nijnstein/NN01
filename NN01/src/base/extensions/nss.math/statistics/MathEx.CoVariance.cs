@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace NSS
 {
     public static partial class MathEx
-    {
+    {                                                           
 
         /// <summary>
         ///  
