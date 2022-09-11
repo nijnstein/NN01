@@ -1,4 +1,5 @@
 ﻿using ILGPU;
+using ILGPU.IR.Values;
 using ILGPU.Runtime;
 using Microsoft.Win32.SafeHandles;
 using NSS;
@@ -48,7 +49,10 @@ namespace NN01
             if (activations == null) throw new ArgumentNullException("activations");
             if (layerSizes.Length <= 2 || activations.Length <= 1 || layerSizes.Length != activations.Length + 1) throw new ArgumentOutOfRangeException("there must be at least 3 layers and activations must be 1 index shorter as they sit between layers");
 
-            if (random == null) random = new CPURandom(RandomDistributionInfo.Default); 
+            if (random == null)
+            {
+                random = new CPURandom(RandomDistributionInfo.Uniform(0.5f, 0.5f));
+            }
 
             layers = new Layer[layerSizes.Length];
 
@@ -217,9 +221,9 @@ namespace NN01
             return Output.Neurons;
         }
 
-        public float CalculateError(float ideal, float actual) => .5f * (ideal - actual).Square(); 
-        public float CalculateError(Span<float> ideal, Span<float> actual) => 0.5f * Intrinsics.SumSquaredDifferences(ideal, actual); 
-        public float CalculateActivationDelta(float ideal, float actual) => -(ideal - actual);
+        static public float CalculateError(float ideal, float actual) => .5f * (ideal - actual).Square(); 
+        static public float CalculateError(Span<float> ideal, Span<float> actual) => 0.5f * Intrinsics.SumSquaredDifferences(ideal, actual); 
+        static public float CalculateActivationDelta(float ideal, float actual) => -(ideal - actual);
 
  
         /// <summary>
@@ -229,27 +233,30 @@ namespace NN01
         ///  - uses shuffled indices 
         ///  - updates sample error 
         ///  - stored actual|output activation in samples.Actual buffer instead of network output neurons
+        ///  
+        ///  NOTE: 
+        ///  the gpu feeds all populations in one action while the cpu method feeds only 1
         /// 
         /// </summary>
         /// <returns>total input set error</returns>
-        public float FeedForward(SampleSet samples, Accelerator? acc)
+        public float FeedForward(SampleSet samples, int populationIndex)
         {
             float error = 0f;
 
             // reset delta & gamma buffers 
+            
             for (int i = 0; i < layers.Length - 1; i++)
             {
                 layers[i].Delta.Zero();
                 layers[i].Gamma.Zero(); 
             }
 
-            if (!gpu_feedforward(acc, samples, out error))
-            {
-                // feed all samples 
+                // Fallback: CPU-AVX
+                // - handles 1 POPULATION at a time 
                 for (int sampleIndex = 0; sampleIndex < samples.SampleCount; sampleIndex++)
                 {
                     Span<float> sample = samples.ShuffledData(sampleIndex);
-                    Span<float> actual = samples.ShuffledActual(sampleIndex);
+                    Span<float> actual = samples.ShuffledActual(populationIndex, sampleIndex);
                     Span<float> ideal = samples.ShuffledExpectation(sampleIndex);
 
                     // activate first hidden layer from sample data
@@ -272,238 +279,31 @@ namespace NN01
 
                     // calc error on sample
                     float sampleError = CalculateError(ideal, actual);
+                
+                  //  actual.CopyTo(layers[layers.Length - 1].Neurons);
 
                     error += sampleError;
-                    samples.SetShuffledError(sampleIndex, sampleError);
+                    samples.SetShuffledError(populationIndex, sampleIndex, sampleError);
                 }
-            }
             
             return error; 
         }
-                
-        /// <summary>
-        /// Specialized FeedForward GPU Kernel 
-        /// - 4 layers 
-        /// - activations: ReLU -> TanH -> LeakyRelu 
-        /// - cost: meansquared 
-        /// </summary>
-        private static void gpu_feedforward_4_relu_tanh_lerelu_batch(
-            Index1D sampleIndex,
-            ArrayView2D<float, Stride2D.DenseX> data,
-            ArrayView2D<float, Stride2D.DenseX> expectation,
-            ArrayView1D<float, Stride1D.Dense> sampleErrors,
-            ArrayView2D<float, Stride2D.DenseX> w0,
-            ArrayView1D<float, Stride1D.Dense> b0,
-            ArrayView1D<float, Stride1D.Dense> h0,
-            ArrayView2D<float, Stride2D.DenseX> w1,
-            ArrayView1D<float, Stride1D.Dense> b1,
-            ArrayView1D<float, Stride1D.Dense> h1,
-            ArrayView2D<float, Stride2D.DenseX> w2,
-            ArrayView1D<float, Stride1D.Dense> b2,
-            ArrayView2D<float, Stride2D.DenseX> actual,
-            ArrayView1D<float, Stride1D.Dense> h2)
-        {
-            int sampleSize = w0.IntExtent.Y;
-            int classCount = h2.IntLength;
 
-            // Interop.Write("sample size: {0}, classes: {1} ", sampleSize, classCount);
+     
 
-            // ReLU 0 -> 1 
-            //layers[1].Activate(layers[0], sample, layers[1].Neurons);
-            gpu_relu(sampleIndex, sampleSize, sampleSize * sampleIndex, data.BaseView, h0, w0, b0);
-
-            // TanH 1 -> 2
-            //layers[2].Activate(layers[1]);
-            gpu_relu(sampleIndex, sampleSize, 0, h0, h1, w1, b1);
-
-            // LeakyReLU 2 -> 3 
-            //layers[3].Activate(layers[2], layers[layers.Length - 2].Neurons, actual);
-            gpu_relu(sampleIndex, sampleSize, 0, h1, h2, w2, b2);
-
-            // calc error on sample expectation 
-            // int l = info.ClassCount;
-            float sum = 0; 
-            for (int i = 0; i < classCount; i++)
-            {
-                float f = (expectation[sampleIndex, i] - h2[i]);
-                actual[sampleIndex, i] = h2[i];
-                sum += f * f; 
-            }
-            sampleErrors[sampleIndex] = sum * 0.5f;            
-        }
-
-        static void gpu_relu(int sampleIndex, int sampleSize, int baseIndex, ArrayView<float> n0, ArrayView<float> n1, ArrayView2D<float, Stride2D.DenseX> w01, ArrayView<float> b1)
-        {
-            //Interop.Write("-{0}-", n0.Length);       
-            for (int index = 0; index < n1.IntLength; index++)
-            {
-                // index 0...j foreach [] in n01 
-                float sum = 0f;
-
-                // weighted sum 
-                for (int i0 = 0; i0 < w01.Extent.Y; i0++)
-                {
-                    sum += w01[index, i0] * n0[baseIndex + i0];
-                    /// sum += w01[index, i0] * n0[baseIndex + i0];
-                }
-
-                sum += b1[index];
-
-                // ReLU
-                n1[index] = MathF.Max(sum, 0);
-            }
-        }
-
-
-
-
-        private static Action<
-            Index1D,
-            ArrayView2D<float, Stride2D.DenseX>,
-            ArrayView2D<float, Stride2D.DenseX>,
-            ArrayView1D<float, Stride1D.Dense>,
-            ArrayView2D<float, Stride2D.DenseX>,
-            ArrayView1D<float, Stride1D.Dense>,
-            ArrayView1D<float, Stride1D.Dense>,
-            ArrayView2D<float, Stride2D.DenseX>,
-            ArrayView1D<float, Stride1D.Dense>,
-            ArrayView1D<float, Stride1D.Dense>,
-            ArrayView2D<float, Stride2D.DenseX>,
-            ArrayView1D<float, Stride1D.Dense>,
-            ArrayView2D<float, Stride2D.DenseX>,
-            ArrayView1D<float, Stride1D.Dense>>? get_gpu_feedforward_kernel(int layerCount, LayerActivationFunction a1, LayerActivationFunction a2, LayerActivationFunction a3, bool batched, bool softmax)
-        {
-            switch (layerCount)
-            {
-
-                case 4:
-                    {
-                        if( a1 == LayerActivationFunction.ReLU && a2 == LayerActivationFunction.Tanh && a3 == LayerActivationFunction.LeakyReLU)
-                        {
-                            if (softmax)
-                            {
-                                if (batched)
-                                {
-                                }
-                                else
-                                {
-                                }
-                            }
-                            else
-                            {
-                                if (batched)
-                                {
-                                    return gpu_feedforward_4_relu_tanh_lerelu_batch;
-                                }
-                                else
-                                {
-
-                                }
-                            }                            
-                        }
-                    }
-                    break; 
-
-            }
-            return null; 
-        }
-
-
-        /// <summary>
-        /// returns true if a kernel could be found matching current topology and data if fed forward
-        /// </summary>
-        /// <param name="acc">gpu accelerator</param>
-        private bool gpu_feedforward(Accelerator? acc, SampleSet samples, out float error)
-        {
-            if(acc == null)
-            {
-                error = 1; 
-                return false; 
-            }
-
-            Debug.Assert(samples != null);
-
-            // get a kernel for given topology 
-            var kernelObject = get_gpu_feedforward_kernel(4, LayerActivationFunction.ReLU, LayerActivationFunction.Tanh, LayerActivationFunction.LeakyReLU, true, false);
-            if(kernelObject == null)
-            {
-                error = 0; 
-                return false;
-            }
-
-            using var w0 = acc.Allocate2DDenseX<float>(layers[1].Weights);
-            using var b0 = acc.Allocate1D<float>(layers[1].Biases);
-            using var h0 = acc.Allocate1D<float>(layers[1].Size);
-
-            using var w1 = acc.Allocate2DDenseX<float>(layers[2].Weights);
-            using var b1 = acc.Allocate1D<float>(layers[2].Biases);
-            using var h1 = acc.Allocate1D<float>(layers[2].Size);
-
-            using var w2 = acc.Allocate2DDenseX<float>(layers[3].Weights);
-            using var b2 = acc.Allocate1D<float>(layers[3].Biases);
-            using var h2 = acc.Allocate1D<float>(layers[3].Size);
-
-            // every 4 layer network has the same kernel format (can we use delegates to kernels?)
-            acc.LaunchAutoGrouped(
-                kernelObject,
-                acc.DefaultStream,
-                new Index1D(samples.SampleCount),
-                samples.gpu_data.View, samples.gpu_expectation.View, samples.gpu_sampleErrors.View,
-                w0.View, b0.View, h0.View,
-                w1.View, b1.View, h1.View,
-                w2.View, b2.View, samples.gpu_actual.View, h2.View);
-
-            // now calculate from that state the error 
-            // -> this is only safe when using a single thread on a single population
-            //
-            //  the error and actual buffer are written too from multiple threads -> watch out!
-            //
-
-            // sum the error on the gpu, less data to return over memory 
-            // - returns 0.... 
-            //float[] sum = new float[1] { 0 };
-            //using var sums = acc.Allocate1D<float>(sum); 
-            //acc.LaunchAutoGrouped<Index1D, ArrayView<float>, ArrayView<float>>(
-            //    (index, errors, sum) => sum[0] += errors[index],
-            //    acc.DefaultStream,
-            //    samples.SampleCount, 
-            //    samples.gpu_sampleErrors.View, 
-            //    sums.View
-            //);
-            //
-            //acc.Synchronize();
-            //sums.CopyToCPU(sum);
-            //error = sum[0]; 
-
-            samples.gpu_sampleErrors.View.CopyToCPU(samples.sampleError);
-            error = Intrinsics.Sum(samples.sampleError);
-
-            return true; 
-        }
-
-
-
-        /// <summary>
-        /// Backpropagate a full training set 
-        /// </summary>
-        /// <param name="trainingSet"></param>
-        /// <param name="gamma"></param>
-        /// <param name="weightLearningRate"></param>
-        /// <param name="biasLearningRate"></param>
-        /// <param name="momentum"></param>
-        /// <param name="weightCost"></param>
-        /// <param name="minCostDelta"></param>
-        public void BackPropagateBatch(
+        public void BackPropagateBatchCPU
+        (
+            int populationIndex,
             SampleSet trainingSet,
             float weightLearningRate = 0.01f, float biasLearningRate = 0.01f, float momentum = 1f, float weightCost = 0.00001f, float minCostDelta = 0.0000001f,
-            IRandom random = null,
-            Accelerator acc = null)
+            IRandom random = null
+         )
         {
             // feed forward all samples and get the total error 
-            float totalError = 1 - (FeedForward(trainingSet, acc) / (trainingSet.SampleSize * trainingSet.SampleCount * trainingSet.Variance));
+            float totalError = (FeedForward(trainingSet, populationIndex) / (trainingSet.SampleSize * trainingSet.SampleCount * trainingSet.Variance));
 
             // calculate total error change foreach output
-            Span2D<float> actual = trainingSet.Actual.AsSpan2D<float>();
+            Span3D<float> actual = trainingSet.Actual.AsSpan3D<float>();
             Span2D<float> expected = trainingSet.Expectation.AsSpan2D<float>();
 
             for (int layerIndex = layers.Length - 1; layerIndex > 0; layerIndex--)
@@ -518,11 +318,14 @@ namespace NN01
             // known as the delta rule: -(target - out) * derivative(out) * out 
             for (int layerIndex = layers.Length - 1; layerIndex > 0; layerIndex--)
             {
+                layers[layerIndex].Delta.Zero();
+                
+
                 for (int sampleIndex = 0; sampleIndex < trainingSet.SampleCount; sampleIndex++)
                 {
                     int shuffledIndex = trainingSet.ShuffledSample(sampleIndex).Index;
 
-                    Span<float> a = layerIndex == layers.Length - 1 ? actual.Row(shuffledIndex) : layers[layerIndex].Neurons.AsSpan();
+                    Span<float> a = layerIndex == layers.Length - 1 ? actual.Row(populationIndex, shuffledIndex) : layers[layerIndex].Neurons.AsSpan();
                     Span<float> e = layerIndex == layers.Length - 1 ? expected.Row(shuffledIndex) : layers[layerIndex].Gamma; //gamma[layerIndex];
 
                     if (layers[layerIndex].Softmax)
@@ -535,43 +338,58 @@ namespace NN01
                     layers[layerIndex].Derivate(a, layers[layerIndex].Gamma);
 
                     // calc error delta with respect to derivate of actual output 
-                    float inverse = 1 / (trainingSet.SampleCount * a.Length); 
+                    float inverse = 1 / (trainingSet.SampleCount * a.Length);
                     for (int i = 0; i < a.Length; i++)
                     {
                         layers[layerIndex].Delta[i] +=
                         (
-                            inverse 
+                            inverse
                             *
                             CalculateActivationDelta(e[i], a[i]) //   -(ideal - actual)
                             *
                             layers[layerIndex].Gamma[i]
                         );
                     }
-                }
-                Intrinsics.MultiplyScalar(layers[layerIndex].Delta, 1f / layers[layerIndex].Size); 
-            }
 
-            for (int layerIndex = layers.Length - 1; layerIndex > 0; layerIndex--)
-            {
-                layers[layerIndex - 1].Gamma.Zero();
-                // calc hidden activation error 
-                for (int j = 0; j < layers[layerIndex - 1].Size; j++)
-                {
-                    for (int i = 0; i < layers[layerIndex].Size; i++)
+                    // calc the new actual for this sample for the previous layer
+             /*      layers[layerIndex - 1].Gamma.Zero();
+                    for (int j = 0; j < layers[layerIndex - 1].Size; j++)
                     {
-                        layers[layerIndex - 1].Gamma[j] += layers[layerIndex].Delta[i] * layers[layerIndex].Weights[i, j];
-                    }
+                        for (int i = 0; i < layers[layerIndex].Size; i++)
+                        {
+                            layers[layerIndex - 1].Gamma[j] += layers[layerIndex].Delta[i] * layers[layerIndex].Weights[i, j];
+                        }
+                    }*/ 
                 }
+                Intrinsics.MultiplyScalar(layers[layerIndex].Delta, 1f / layers[layerIndex].Size);
             }
 
-            for (int layerIndex = layers.Length - 1; layerIndex > 0; layerIndex--)
+            /* for (int layerIndex = layers.Length - 1; layerIndex > 0; layerIndex--)
+             {
+                 // dit zou in de lus hierboven moeten om gamma voor volgende iteratie klaar te maken.... 
+                 ///   calc hidden activation error ..........we trainen 1 laag niet goed volgens mij zo
+                 layers[layerIndex - 1].Gamma.Zero();
+
+                 // calc hidden activation error of previous layer using gamma 
+                 for (int j = 0; j < layers[layerIndex - 1].Size; j++)
+                 {
+                     for (int i = 0; i < layers[layerIndex].Size; i++)
+                     {
+                         layers[layerIndex - 1].Gamma[j] += layers[layerIndex].Delta[i] * layers[layerIndex].Weights[i, j];
+                     }
+                 }
+             }*/
+
+
+            Parallel.For(layers.Length - 1, 1, (layerIndex) =>
+            //for (int layerIndex = layers.Length - 1; layerIndex > 0; layerIndex--)
             {
                 // update biases 
                 for (int j = 0; j < layers[layerIndex].Size; j++)
                 {
                     float delta = layers[layerIndex].Gamma[j] * biasLearningRate;
                     layers[layerIndex].Biases[j] -= delta + (layers[layerIndex].BiasDeltas[j] * momentum);
-                    layers[layerIndex].BiasDeltas[j] = delta; 
+                    layers[layerIndex].BiasDeltas[j] = delta;
                 }
 
                 // update weights from error 
@@ -581,21 +399,20 @@ namespace NN01
                     {
                         float wDelta = weightLearningRate * layers[layerIndex].Delta[i] * layers[layerIndex - 1].Gamma[j];
 
-                        layers[layerIndex].Weights[i, j] -= 
+                        layers[layerIndex].Weights[i, j] -=
                             // current weight to error delta
                             wDelta
                             // momentum 
-                            + (layers[layerIndex].WeightDeltas![i][j] * momentum)
+                            + (layers[layerIndex].WeightDeltas![i, j] * momentum)
                             // strengthen learned 
                             + (weightLearningRate * (layers[layerIndex - 1].Gamma[j] - weightCost * layers[layerIndex].Weights[i, j]));
 
-
-                        layers[layerIndex].WeightDeltas[i][j] = wDelta; 
+                        layers[layerIndex].WeightDeltas[i, j] = wDelta;
                     }
                 }
-            }
+            });
 
-            Cost = Math.Abs(totalError); 
+            Cost = Math.Abs(totalError);
         }
 
             /// <summary>
@@ -699,11 +516,12 @@ namespace NN01
         /// </summary>
         public int Mutate(IRandom random, float chance, float weightRange, float biasRange) 
         {
-            int mutationCount = 0; 
+            int mutationCount = 0;
 
-            for (int i = 1; i < LayerCount; i++)
+            Parallel.For(1, LayerCount, (i) =>
+            //for (int i = 1; i < LayerCount; i++)
             {
-                Span<float> rnd = random.Span(layers[i].Biases.Length); 
+                Span<float> rnd = random.Span(layers[i].Biases.Length);
 
                 for (int j = 0; j < layers[i].Biases.Length; j++)
                 {
@@ -718,28 +536,27 @@ namespace NN01
 
                     mutationCount += b ? 1 : 0;  // (int)b  
                 }
-            }
-
-            for (int i = 1; i < LayerCount; i++)
-            {
+                //}
+                //for (int i = 1; i < LayerCount; i++)
+                //{
                 for (int j = 0; j < layers[i].Weights.GetLength(0); j++)
                 {
-                    Span<float> rnd = random.Span(layers[i].Weights.GetLength(1));
+                    /*Span<float>*/ rnd = random.Span(layers[i].Weights.GetLength(1));
                     for (int k = 0; k < layers[i].Weights.GetLength(1); k++)
                     {
                         bool b = rnd[k] > chance;
-                        
-                        layers[i].Weights[j, k] = 
+
+                        layers[i].Weights[j, k] =
                             b
-                            ? 
+                            ?
                             layers[i].Weights[j, k] += (weightRange + weightRange) * rnd[rnd.Length - k - 1] - weightRange
                             :
                             layers[i].Weights[j, k];
 
-                        mutationCount += b ? 1 : 0; 
+                        mutationCount += b ? 1 : 0;
                     }
                 }
-            }
+            }); 
 
             return mutationCount;
         }

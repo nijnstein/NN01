@@ -30,14 +30,20 @@ namespace NN01
         /// </summary>
         Random,
 
-        Gaussian,
-
         Normal,
 
         /// <summary>
         /// Genarally used for for tanh activation 
         /// </summary>
         HeNormal,
+
+        Glorot,
+
+        Xavier, 
+
+        XavierNormalized
+
+
 
         /// <summary>
         /// == Xavier 

@@ -22,74 +22,123 @@ namespace UnitTests
         string[] trainingDataSets = new string[] {
             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train0.jpg",
             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train1.jpg",
- //            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train2.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train3.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train4.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train5.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train6.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train7.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train8.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train9.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train2.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train3.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train4.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train5.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train6.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train7.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train8.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_train9.jpg",
         };
 
         string[] testDataSets = new string[] {
             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test0.jpg",
             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test1.jpg",
- //             "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test2.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test3.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test4.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test5.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test6.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test7.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test8.jpg",
- //           "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test9.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test2.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test3.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test4.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test5.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test6.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test7.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test8.jpg",
+            "..\\..\\..\\..\\Handwritten Digit Samples\\mnist_test9.jpg",
         };
 
         public void Run(int steps = 100, bool allowGPU = true)
         {
             Trainer.Settings settings = new Trainer.Settings();
-            settings.Population = 64;
+            settings.Population = 12;//64;
             settings.Steps = steps;
             settings.GPU = allowGPU && GPUContext.HaveGPUAcceleration;
             settings.MiniBatchSize = 0;
             settings.LearningRate = 0.01f;
+            settings.BatchedLearningRate = 0.015f;
             settings.OnlineTraining = true;
-            settings.BatchedStartSteps = 15;
-            settings.SoftMax = false; 
+            settings.BatchedStartSteps = 0;
+            settings.MutationChance = 0.4f;
+            settings.SoftMax = false;
+            settings.Random = new CPURandom(RandomDistributionInfo.Uniform(0f, 1f));
 
-            NeuralNetwork nn = new NeuralNetwork(
-              new int[]
-              {
-                  patternSize,
-                  28 * 28 * 2,
-                  32,
-                  ClassCount, // leReLU
-              },
-              new LayerActivationFunction[] {
-                    LayerActivationFunction.ReLU,
-                    LayerActivationFunction.Tanh,//Swish, // .Tanh,
-                    //LayerActivationFunction.Sigmoid
-                     LayerActivationFunction.LeakyReLU
-              },
-              settings.SoftMax
-            );
 
-            int totalParameterCount = nn.CalculateTotalParameterCount();
-            int sampleCountPerClass = 2048 * 2;
-            int testCountPerClass = 128;
+            int sampleCountPerClass = 128;
+            int testCountPerClass = 64;
+
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine("[L]arge: 4096 / class");
+            Console.WriteLine("[M]arge: 1024 / class");
+            Console.WriteLine("[S]mall:  512 / class");
+            Console.WriteLine("[T]iny:   128 / class= default");
+            Console.WriteLine();
+            Console.Write("> choose a network size: "); 
+            switch(Console.ReadKey().Key)
+            {
+                case ConsoleKey.L:
+                    sampleCountPerClass = 1024 * 4;
+                    testCountPerClass = 128 * 16;
+                    break;
+                case ConsoleKey.M:
+                    sampleCountPerClass = 1024;
+                    testCountPerClass = 128 * 4;
+                    break;
+                case ConsoleKey.S:
+                    sampleCountPerClass = 512;
+                    testCountPerClass = 256;
+                    break;
+                default: 
+                case ConsoleKey.T:
+                    sampleCountPerClass = 128;
+                    testCountPerClass = 64;
+                    break;
+            }
+            Console.WriteLine();
+
+            Console.WriteLine();
+            Console.Write("> number of classes to train:");
+            int classCount = int.Parse(Console.ReadLine());
+            Console.Write("> number of steps to batch train: ");
+            settings.BatchedStartSteps = int.Parse(Console.ReadLine());
+            Console.Write("> number of steps to train in total: ");
+            settings.Steps = int.Parse(Console.ReadLine());
 
             settings.ReadyEstimator = (nn) =>
             {
                 return (nn.Cost < 0.00001f && nn.Cost != 0);
             };
-            
-            settings.FitnessEstimator = (network, samples) =>
-            {
-                return 1 - Math.Min(0.999999f, network.Cost);
-            };
-            
+
+            //  settings.FitnessEstimator = (network, samples) =>
+            //  {
+            //       return 1 - Math.Min(0.999999f, network.Cost);
+            //   };
+
+            NeuralNetwork nn = new NeuralNetwork(
+              new int[]
+              {
+                              patternSize,
+                              28 * 28,
+                              28 * 2,
+                              classCount,
+              },
+              new LayerActivationFunction[] {
+                                LayerActivationFunction.ReLU,
+                                LayerActivationFunction.Tanh,
+                               LayerActivationFunction.Sigmoid
+              },
+              settings.SoftMax,
+              settings.Random
+            );
+
+            int totalParameterCount = nn.CalculateTotalParameterCount();
+
             settings.OnStep = (NeuralNetwork network, int step, bool batched, float populationError, float ms, int mutationCount) =>
             {
+                if (step == -1)
+                {
+                    Console.WriteLine($"> Data loaded & prepared in: {ms.ToString("0.000")}ms");
+                    Console.WriteLine(">");
+                    return;
+                }
                 if (step == 0)
                 {
                     Console.WriteLine($"> Step     Trainingmode       Population Fittness        Lowest Cost      Best Fit         Mutations    %of Population      Steptime     ");
@@ -127,9 +176,9 @@ namespace UnitTests
             int currentIndex = 0;
             int testIndex = 0;
 
-            SampleSet trainingSet = new SampleSet(28 * 28, sampleCountPerClass * ClassCount, ClassCount);
-            SampleSet testSet = new SampleSet(28 * 28, testCountPerClass * ClassCount, ClassCount);
-            for (int i = 0; i < ClassCount; i++)
+            SampleSet trainingSet = new SampleSet(28 * 28, sampleCountPerClass * classCount, classCount, settings.Population);
+            SampleSet testSet = new SampleSet(28 * 28, testCountPerClass * classCount, classCount, settings.Population);
+            for (int i = 0; i < classCount; i++)
             {
                 Console.Write($"> {Path.GetFileName(trainingDataSets[i])} ");
                 currentIndex = trainingSet.LoadDigitGrid(currentIndex, trainingDataSets[i], i + 1, 28, 28, sampleCountPerClass);
@@ -146,34 +195,19 @@ namespace UnitTests
             DisplaySample(trainingSet.probabilityIndex, 28, ConsoleColor.Yellow);
 
 
-            Console.WriteLine("\n> Starting training.. [Q] to stop");
+            Console.WriteLine("\n> Starting training.. ");
             sw.Reset();
             sw.Start();
 
-            int stepsTrained = 0;
-            CancellationTokenSource canceller = new CancellationTokenSource();
-
-            //Task task = Task.Factory.StartNew(() => {
-                stepsTrained = Trainer.Train
+            int stepsTrained = Trainer.Train
                 (
                     nn,
                     trainingSet,
                     testSet,
                     settings
                 ); 
-            //}, canceller.Token, TaskCreationOptions.None, PriorityScheduler.BelowNormal);
 
- //           while(!task.IsCompleted && !task.IsCanceled)
- //           {
- //               task.Wait(10000, canceller.Token);
- //               if(Console.KeyAvailable && Console.ReadKey().Key == ConsoleKey.Q)
- //               {
- //                   canceller.Cancel(); 
- //               }
- //               Console.Write('.'); 
- //           }
             Console.WriteLine(); 
-
             Console.WriteLine($"Training Completed:");
             Console.WriteLine("");
             Console.WriteLine($">          Time: {sw.Elapsed.TotalMilliseconds.ToString("0.000")}ms");

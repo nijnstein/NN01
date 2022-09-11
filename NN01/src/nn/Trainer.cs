@@ -15,12 +15,6 @@ namespace NN01
 {
     public partial class Trainer
     {
-        public GPUContext? GPUContext;
-
-        public NeuralNetwork? Network;
-        public List<NeuralNetwork>? Networks;
-        public Settings? settings;
-
         private int istep;
         private float currentMomentum;
         private float currentWeightCost;
@@ -34,9 +28,11 @@ namespace NN01
         {
             Debug.Assert(network != null);
             Debug.Assert(trainingSamples != null);
-            Debug.Assert(testSamples != null); 
+            Debug.Assert(testSamples != null);
 
             settings = settings == null ? Settings.Default : settings;
+            Stopwatch? sw = settings.OnStep != null ? new Stopwatch() : null;
+            if (sw != null) sw.Start(); 
 
             // prepare samples
             if (settings.MeanCancelation)
@@ -46,55 +42,35 @@ namespace NN01
             }
 
             // prepare gpu (random + memory)  
-            IRandom random;
-            using GPUContext ctx = GPUContext.Create();
-#if DEBUG
-            Accelerator acc = settings.GPU ? ctx.CreateCPUAccelerator() : null;
-#else
-            Accelerator acc = settings.GPU ? ctx.CreateGPUAccelerator() : null;
-#endif
-            if (settings.GPU && acc != null)
+            if (settings.Random == null)
             {
-                trainingSamples.AllocateGPU(acc);
-                testSamples.AllocateGPU(acc); 
+                settings.Random = new CPURandom(RandomDistributionInfo.Uniform());
             }
-           
-            if (settings.Random != null)
-            {
-                random = settings.Random;
-            }
-            else
-            {
-                if(settings.RandomGPU)
-                {
-                    random = new GPURandom(RandomDistributionInfo.Uniform(0, 1), 128 * 2048, Environment.ProcessorCount * 2, null);
-                }
-                else
-                {
-                   random = new CPURandom(RandomDistributionInfo.Default); 
-                }
-            }
- 
-
-            // initialize a population 
+            
             List<NeuralNetwork> networks = new List<NeuralNetwork>(settings.Population);
             networks.Add(network);
             for (int i = 1; i < settings.Population; i++)
             {
-                networks.Add(new NeuralNetwork(network, random));
+                networks.Add(new NeuralNetwork(network, settings.Random));
             }
-
 
             int istep = 0;
             float currentMomentum = settings.InitialMomentum;
             float currentWeightCost = settings.InitialWeightCost;
+
             NeuralNetwork best = new NeuralNetwork(network, true);
+            best.Fitness = 0;
+            best.Cost = float.MaxValue;
             
             // shuffle training set 
-            trainingSamples.ShuffleIndices(random);
+            trainingSamples.ShuffleIndices(settings.Random);
 
             // timings are nice, but only if used 
-            Stopwatch? sw = settings.OnStep != null ? new Stopwatch() : null; 
+            if(sw != null && settings.OnStep != null)
+            {
+                sw.Stop();
+                settings.OnStep(network, -1, false, 0, (float)sw.Elapsed.TotalMilliseconds, 0);
+            }
 
             for (; istep < settings.Steps; istep++)
             {
@@ -106,33 +82,29 @@ namespace NN01
                 bool batched = (istep < settings.BatchedStartSteps) || !settings.OnlineTraining;
                 int mutationCount = 0;
 
+
                 // train 1 step
-                if (settings.GPU)
-                {
-                    for (int populationIndex = 0; populationIndex < settings.Population; populationIndex++)
-                    {
-                        mutationCount += Step(network, trainingSamples, testSamples, settings, random, acc, networks, istep, currentMomentum, batched, populationIndex);
-                    }
-                }
-                else
-                {
 #if DEBUG
                     for (int j = 0; j < settings.Population; j++)
                     {
-                        mutationCount += Step(network, trainingSamples, testSamples, settings, random, acc, networks, istep, currentMomentum, batched, j);
+                         mutationCount += Step(network, trainingSamples, testSamples, settings, settings.Random, networks, istep, currentMomentum, batched, j);
                     }
 #else
                     Parallel.For(0, settings.Population, (j) =>
                     {
                         mutationCount = Interlocked.Add(
                             ref mutationCount,
-                            Step(network, trainingSamples, testSamples, settings, random, acc, networks, istep, currentMomentum, batched, j));
+                            Step(network, trainingSamples, testSamples, settings, settings.Random, networks, istep, currentMomentum, batched, j));
                     });
 #endif
-                }
+                                    
 
                 // shuffle training set 
-                trainingSamples.ShuffleIndices(random);
+                // - no use if batched 
+              //  if (!batched)
+                {
+                    trainingSamples.ShuffleIndices(settings.Random);
+                }
 
                 // sort the training set
                 // trainingSamples.SortOnErrorAlternatingOnClass(); 
@@ -177,7 +149,7 @@ namespace NN01
                     }
                 }
 
-                float populationError = networks.Average(x => x.Fitness.Square());
+                float populationError = networks.Average(x => x.Fitness);//.Square());
 
 
                 // notify 
@@ -193,43 +165,22 @@ namespace NN01
 
         ready:
            
-            if (settings.GPU && acc != null)
-            {
-                try
-                {
-                    trainingSamples.ReleaseGPU(acc);
-                    testSamples.ReleaseGPU(acc); 
-                    acc.Dispose();
-                }
-                catch(Exception ex)
-                {
-                    Debug.WriteLine("error disposing accelerator: " + ex.ToString()); 
-                }
-            }
-            if(settings.RandomGPU && settings.Random == null)
-            {
-                if (random is GPURandom gpuRandom) gpuRandom.Dispose();                 
-            }
             return istep;
         }
 
-        private static int Step(NeuralNetwork network, SampleSet trainingSamples, SampleSet testSamples, Settings? settings, IRandom random, Accelerator acc, List<NeuralNetwork> networks, int istep, float currentMomentum, bool batched, int j)
+        private static int Step(NeuralNetwork network, SampleSet trainingSamples, SampleSet testSamples, Settings? settings, IRandom random, List<NeuralNetwork> networks, int istep, float currentMomentum, bool batched, int j)
         {
-            int mutationCount = 0; 
-
-            // mutate population member if:
-            // - not on the first step 
-            // - located in bad half 
-            if (settings.MutationChance > 0 && istep > 0 && j < settings.Population / 2)
-            {
-                networks[(int)(j + settings.Population / 2)].DeepClone(networks[j]);
-                mutationCount = networks[(int)j].Mutate(random, settings.MutationChance, settings.WeightMutationStrength, settings.BiasMutationStrength);
-            }
+            int mutationCount = 0;
 
             // back propagate population
             // 
             if (!batched)
             {
+                // mutate population member if:
+                // - not on the first step 
+                // - located in bad half 
+                mutationCount = MutatePopulationMember(settings, random, networks, istep, j);
+
                 // setup buffers
                 float[][] gamma = new float[network.LayerCount][];
                 for (int i = 0; i < network.LayerCount; i++)
@@ -258,20 +209,44 @@ namespace NN01
             }
             else
             {
+                mutationCount = MutatePopulationMember(settings, random, networks, istep, j);
+
                 // batched training 
-                networks[j].BackPropagateBatch(
+                // networks[j].
+                networks[j].BackPropagateBatchCPU(
+                    j,
                     trainingSamples,
-                    settings.LearningRate,// * (settings.SoftMax ? 1f : 5f), 
-                    settings.LearningRate,// * (settings.SoftMax ? 1f : 5f), 
+                    settings.BatchedLearningRate,// * (settings.SoftMax ? 1f : 5f), 
+                    settings.BatchedLearningRate,// * (settings.SoftMax ? 1f : 5f), 
                     currentMomentum,
                     1E-05f, 1E-07F,
-                    null,
-                    acc);
+                    null);
             }
 
-            // recalculate fittness 
-            networks[(int)j].Fitness = settings.FitnessEstimator(networks[(int)j], trainingSamples) * settings.FitnessEstimator(networks[j], testSamples);
+            networks[(int)j].Fitness =
+                settings.FitnessEstimator(networks[(int)j], trainingSamples)
+                *
+                settings.FitnessEstimator(networks[j], testSamples);
+
             return mutationCount;
+        }
+
+        private static int MutatePopulationMember(Settings? settings, IRandom random, List<NeuralNetwork> networks, int istep, int populationIndex)
+        {
+            if (settings.MutationChance > 0 && istep > 0 && populationIndex < settings.Population / 2)
+            {
+                // clone a better netwok into this one
+                networks[(int)(populationIndex + settings.Population / 2)].DeepClone(networks[populationIndex]);
+
+                // and mutate it according to settings 
+                return networks[(int)populationIndex].Mutate(
+                    random, 
+                    settings.MutationChance, 
+                    settings.WeightMutationStrength, 
+                    settings.BiasMutationStrength);
+            }
+
+            return 0;
         }
 
         public static bool EstimateIfReady(NeuralNetwork network, Func<NeuralNetwork, bool> readyEstimator, Settings settings, List<NeuralNetwork> networks)
@@ -297,8 +272,8 @@ namespace NN01
 
             return Train(
                 network,
-                new SampleSet(patterns, classes, network.Output.Size, softmaxEnabled),
-                new SampleSet(testPatterns, testClasses, network.Output.Size, softmaxEnabled),
+                new SampleSet(patterns, classes, network.Output.Size, softmaxEnabled, 1),
+                new SampleSet(testPatterns, testClasses, network.Output.Size, softmaxEnabled, 1),
                 settings
             );
         }

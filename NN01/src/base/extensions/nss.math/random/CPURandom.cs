@@ -1,27 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing.Printing;
 using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace NSS
 {
+
+
     public class CPURandom : IRandom
     {
+        private SimpleRNG rng;
         public RandomDistributionInfo Info { get; set; }
 
         public RandomDistributionType DistributionType => RandomDistributionType.Uniform;
 
-        readonly float p1;
-        readonly float p2; 
-
         public CPURandom(RandomDistributionInfo info)
         {
-            Debug.Assert(info.DistributionType == RandomDistributionType.Uniform); 
-            p1 = (Info.High - Info.Low);
-            p2 = (Info.Low + Info.High) / 2; 
+            //Debug.Assert(info.DistributionType == RandomDistributionType.Uniform);
+            rng = new SimpleRNG();
+            // rng.SetSeedFromSystemTime(DateTime.Now);
+            Info = info;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -39,16 +43,18 @@ namespace NSS
             }
         }
 
+    
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Next(int i)
         {
-            return Random.Shared.Next(i); 
+            return rng.GetInt(i); 
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float NextSingle()
         {
-            return p1 * Random.Shared.NextSingle() - p2; 
+            return Info.Kernel(rng, Info.P1, Info.P2, Info.P3);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

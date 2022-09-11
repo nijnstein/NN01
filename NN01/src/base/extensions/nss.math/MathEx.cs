@@ -395,10 +395,14 @@ namespace NSS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float[] Zero(this float[] a)
         {
-            unchecked
-            {
-                for (int i = 0; i < a.Length; i++) a[i] = 0f;
-            }
+            a.AsSpan().Zero();
+            return a;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int[] Zero(this int[] a)
+        {
+            a.AsSpan().Zero();
             return a;
         }
 
@@ -408,35 +412,62 @@ namespace NSS
             a.AsSpan2D<float>().Slice(0, a.Length).Zero();
             return a;
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Span<float> Zero(this Span<float> a)
+        public static float[,,] Zero(this float[,,] a)
         {
-            unchecked
-            {
-                for (int i = 0; i < a.Length; i++) a[i] = 0f;
-            }
-            return a;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float[] Ones(this float[] a)
-        {
-            for (int i = 0; i < a.Length; i++) a[i] = 1f;
+            a.AsSpan<float>().Zero();
             return a;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double[] Ones(double[] a)
         {
-            for (int i = 0; i < a.Length; i++) a[i] = 1;
+            unchecked
+            {
+                int i = 0;
+                while (i < (a.Length & ~7))
+                {
+                    a[i + 0] = 1;
+                    a[i + 1] = 1;
+                    a[i + 2] = 1;
+                    a[i + 3] = 1;
+                    a[i + 4] = 1;
+                    a[i + 5] = 1;
+                    a[i + 6] = 1;
+                    a[i + 7] = 1;
+                    i += 8;
+                }
+                while (i < a.Length)
+                {
+                    a[i++] = 1;
+                }
+            }
             return a;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int[] Ones(int[] a)
         {
-            for (int i = 0; i < a.Length; i++) a[i] = 1;
+            unchecked
+            {
+                int i = 0;
+                while (i < (a.Length & ~7))
+                {
+                    a[i + 0] = 1;
+                    a[i + 1] = 1;
+                    a[i + 2] = 1;
+                    a[i + 3] = 1;
+                    a[i + 4] = 1;
+                    a[i + 5] = 1;
+                    a[i + 6] = 1;
+                    a[i + 7] = 1;
+                    i += 8;
+                }
+                while (i < a.Length)
+                {
+                    a[i++] = 1;
+                }
+            }
             return a;
         }
 
@@ -576,11 +607,19 @@ namespace NSS
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float Average(this Span<float> a) => Intrinsics.Sum(a) / a.Length; 
-        
-        [Pure]                                            
+        public static float Average(this Span<float> a) => Intrinsics.Sum(a) / a.Length;
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Average(this Span<int> a) => MathEx.Sum(a) / a.Length;
+
+        [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Variance(this Span<float> a) => Variance(a, Average(a));
+        
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Variance(this Span<int> a) => Variance(a, Average(a));
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -598,6 +637,46 @@ namespace NSS
             }
             return sq / c;
         }
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Variance(this Span<int> a, float average) 
+            => MathEx.SumSquaredDifferences(a, average) / a.Length;
+
+
+        [Pure]
+        [MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+        public static float SumSquaredDifferences(Span<int> a, float mean)
+        {
+            float sum = 0;
+            int i = 0;
+            unchecked
+            {
+                while (i < a.Length)
+                {
+                    sum += (a[i] - mean).Square();
+                    i++;
+                }
+            }
+            return sum;
+        }
+
+        [Pure]
+        [MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+        public static int Sum(Span<int> a)
+        {
+            int sum = 0;
+            int i = 0;
+            unchecked
+            {
+                while (i < a.Length)
+                {
+                    sum += a[i];
+                    i++;
+                }
+            }
+            return sum;
+        }
+
 
         /// <summary>
         /// V =  sum((a - mean)^2) / a.length

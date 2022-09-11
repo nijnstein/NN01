@@ -14,10 +14,15 @@ namespace NSS.Neural
         private Sample[] samples;
         private float[,] data;
         private float[,] expectation;
-        private float[,] actual; 
+        private float[,,] actual;
         private int[] indexTable;
         public float[] probabilityIndex;
-        public float[] sampleError;
+        public float[,] sampleError;
+
+        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_data;
+        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_expectation;
+        internal MemoryBuffer3D<float, Stride3D.DenseXY> gpu_actual;
+        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_sampleErrors;
 
         public float Variance;
         public float Average;
@@ -25,21 +30,27 @@ namespace NSS.Neural
         public Sample[] Samples => samples;
         public float[,] Data => data;
         public float[,] Expectation => expectation;
-        public float[,] Actual => actual;
+        public float[,,] Actual => actual;
         public float[] ProbabilityIndex => probabilityIndex; 
 
         public Span<int> Indices => indexTable;
         public bool IsPrepared { get; private set; }
         public Span<float> SampleData(int sampleIndex) => data.AsSpan2D<float>().Row(sampleIndex);
         public Span<float> SampleExpectation(int sampleIndex) => expectation.AsSpan2D<float>().Row(sampleIndex);
-        public float SampleError(int sampleIndex) => sampleError[sampleIndex]; 
+        public float SampleError(int populationIndex, int sampleIndex) => sampleError[populationIndex, sampleIndex]; 
         public Sample ShuffledSample(int sampleIndex) => samples[indexTable[sampleIndex]]; 
         public Span<float> ShuffledData(int sampleIndex) => data.AsSpan2D<float>().Row(indexTable[sampleIndex]);
         public Span<float> ShuffledExpectation(int sampleIndex) => expectation.AsSpan2D<float>().Row(indexTable[sampleIndex]);
+        public void SetSampleError(int populationIndex, int sampleIndex, float error) => sampleError[populationIndex, sampleIndex] = error;
+        public void SetShuffledError(int populationIndex, int shuffledIndex, float error) => sampleError[populationIndex, indexTable[shuffledIndex]] = error;
+        public Span<float> ShuffledActual(int populationIndex, int sampleIndex) => actual.AsSpan3D<float>().Row(populationIndex, indexTable[sampleIndex]);
+        public Span<float> SampleActual(int populationIndex, int sampleIndex) => actual.AsSpan3D<float>().Row(populationIndex, sampleIndex);
 
 
+        public bool IsGPUMemoryAllocated { get; protected set; } = false;
 
-        public SampleSet(int sampleSize, int sampleCount, int classCount)
+
+        public SampleSet(int sampleSize, int sampleCount, int classCount, int populationCount)
         {
             SampleSize = sampleSize;
             SampleCount = sampleCount;
@@ -48,13 +59,18 @@ namespace NSS.Neural
             samples = new Sample[sampleCount];
             data = new float[sampleCount, sampleSize];
             expectation = new float[sampleCount, classCount];
-            actual = new float[sampleCount, classCount]; 
-            sampleError = new float[sampleCount]; 
+            actual = new float[populationCount, sampleCount, classCount]; 
+            sampleError = new float[populationCount, sampleCount]; 
 
-            IsPrepared = false; 
+            IsPrepared = false;
+
+            gpu_data = null; 
+            gpu_expectation = null;
+            gpu_sampleErrors = null;
+            gpu_actual = null;
         }
 
-        public SampleSet(float[,] patterns, int[] classes, int classCount, bool softmax)
+        public SampleSet(float[,] patterns, int[] classes, int classCount, bool softmax, int populationCount)
         {
             Debug.Assert(patterns != null && classes != null);
 
@@ -68,13 +84,18 @@ namespace NSS.Neural
             data = patterns;
             samples = new Sample[SampleCount];
             expectation = new float[SampleCount, ClassCount];
-            actual = new float[SampleCount, ClassCount];
-            sampleError = new float[SampleCount];
+            actual = new float[populationCount, SampleCount, ClassCount];
+            sampleError = new float[populationCount, SampleCount];
 
             for (int i = 0; i < SampleCount; i++)
             {
                 samples[i] = new Sample(i, SampleSize, classes[i], ClassCount);
             }
+
+            gpu_data = null;
+            gpu_expectation = null;
+            gpu_sampleErrors = null;
+            gpu_actual = null;
 
             Prepare(softmax);
         }
@@ -176,16 +197,8 @@ namespace NSS.Neural
             }
         }
 
-        public Span<int> ShuffleIndices(Random random)
-        {
-            return ShuffleIndices(indexTable, random);
-        }
-
-        public Span<int> ShuffleIndices(IRandom random)
-        {
-            return ShuffleIndices(indexTable, random);
-        }
-
+        public Span<int> ShuffleIndices(Random random) => ShuffleIndices(indexTable, random);
+        public Span<int> ShuffleIndices(IRandom random) => ShuffleIndices(indexTable, random);
         public Span<int> ShuffleIndices(Span<int> indices, Random random)
         {
             int n = indices.Length;
@@ -200,7 +213,6 @@ namespace NSS.Neural
             }
             return indices;
         }
-
         public Span<int> ShuffleIndices(Span<int> indices, IRandom random)
         {
             int n = indices.Length;
@@ -215,6 +227,7 @@ namespace NSS.Neural
             }
             return indices;
         }
+
 
         public void GenerateIndexArray()
         {
@@ -264,29 +277,12 @@ namespace NSS.Neural
         }
 
 
-        public void SetSampleError(int sampleIndex, float error) => sampleError[sampleIndex] = error;
-
-        public void SetShuffledError(int shuffledIndex, float error) => sampleError[indexTable[shuffledIndex]] = error;
-
-        public Span<float> ShuffledActual(int sampleIndex) => actual.AsSpan2D<float>().Row(indexTable[sampleIndex]);
- 
-        public Span<float> SampleActual(int sampleIndex) => actual.AsSpan2D<float>().Row(sampleIndex);
-
-
-        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_data = null;
-        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_expectation = null;
-
-        // -> should have extra dimension for population index 
-        internal MemoryBuffer2D<float, Stride2D.DenseX> gpu_actual = null;
-        internal MemoryBuffer1D<float, Stride1D.Dense> gpu_sampleErrors = null;
-        public bool IsGPUMemoryAllocated { get; protected set; } = false; 
-
-        public void AllocateGPU(Accelerator acc)
+        public void AllocateGPU(Accelerator acc, int populationCount)
         {
             gpu_data = acc.Allocate2DDenseX<float>(Data);
             gpu_expectation = acc.Allocate2DDenseX<float>(Expectation);
-            gpu_sampleErrors = acc.Allocate1D<float>(SampleCount);
-            gpu_actual = acc.Allocate2DDenseX<float>(Actual);
+            gpu_sampleErrors = acc.Allocate2DDenseX<float>(sampleError);
+            gpu_actual = acc.Allocate3DDenseXY<float>(actual); 
             acc.Synchronize(); 
         }
 
