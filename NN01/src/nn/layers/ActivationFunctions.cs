@@ -167,5 +167,76 @@ namespace NN01
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float SoftplusDerivative(float x) => x.Sigmoid();
+
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float ParametricReLU(float x, float a)
+        {
+            return x < 0 ? a * x : x;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float ParametricReLUDerivative(float x, float a)
+        {
+            return x < 0 ? a : 1;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Logistic(float x)
+        {
+            return 1f / (1f + MathF.Pow(MathF.E, -x));
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float LogisticDerivative(float x)
+        {
+            return Logistic(x) * (1f - Logistic(x));
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float BipolarSigmoid(float x)
+        {
+            return (1f - MathF.Exp(-x)) / (1F + MathF.Exp(-x));
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float BipolarSigmoidDerivative(float x)
+        {
+            return 0.5f * (1f + BipolarSigmoid(x)) * (1f - BipolarSigmoid(x));
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float Gaussian(float x)
+        {
+            return MathF.Pow(MathF.E, MathF.Pow(-x, 2f));
+        }
+        
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float GaussianDerivative(float x)
+        {
+            return -2f * x * MathF.Pow(MathF.E, MathF.Pow(-x, 2f));
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float BentIdentity(float x)
+        {
+            return (((MathF.Sqrt(MathF.Pow(x, 2f) + 1f)) - 1f) / 2f) + x;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float DBentIdentity(float x)
+        {
+            return (x / (2f * MathF.Sqrt(MathF.Pow(x, 2f) + 1f))) + 1f;
+        }
     }
 }

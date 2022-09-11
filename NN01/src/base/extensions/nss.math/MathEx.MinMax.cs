@@ -466,16 +466,92 @@ namespace NSS
 			}
 		}
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		static public byte Clip255(int i)
-		{
-			return (byte)Math.Min(255, Math.Max(0, i));
-		}
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		static public byte Clip01(float f)
-		{
-			return (byte)Math.Min(1, Math.Max(0, f));
-		}
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMax(this Span<float> f)
+        {
+            float max = float.MinValue;
+            int j = -1;
+            unchecked
+            {
+                for (int i = 0; i < f.Length; i++)
+                {
+                    if (f[i] > max)
+                    {
+                        max = f[i];
+                        j = i;
+                    }
+                }
+            }
+            return j;
+        }
 
-	}
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMax(this float[] f)
+        {
+            return ArgMax(f.AsSpan());
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMin(this Span<float> f)
+        {
+            float min = float.MaxValue;
+            int j = -1;
+            unchecked
+            {
+                for (int i = 0; i < f.Length; i++)
+                {
+                    if (f[i] < min)
+                    {
+                        min = f[i];
+                        j = i;
+                    }
+                }
+            }
+            return j;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMin(this float[] f)
+        {
+            return ArgMin(f.AsSpan());
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMax(this ReadOnlySpan<float> f)
+        {
+            float max = float.MinValue;
+            int j = -1;
+            unchecked
+            {
+                for (int i = 0; i < f.Length; i++)
+                {
+                    if (f[i] > max)
+                    {
+                        max = f[i];
+                        j = i;
+                    }
+                }
+            }
+            return j;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ArgMin(this ReadOnlySpan<float> f)
+        {
+            float min = float.MaxValue;
+            int j = -1;
+            unchecked
+            {
+                for (int i = 0; i < f.Length; i++)
+                {
+                    if (f[i] < min)
+                    {
+                        min = f[i];
+                        j = i;
+                    }
+                }
+            }
+            return j;
+        }
+    }
 }

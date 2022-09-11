@@ -230,7 +230,7 @@ namespace NSS.GPU
                                         }
                                         break;
 
-                                    case RandomDistributionType.Gaussian:
+                                    case RandomDistributionType.LogNormal:
                                         {
                                             accelerator!.LaunchAutoGrouped<Index1D, ArrayView<float>, float, float>(
                                                     GaussianGPUKernel, chunkSize, gpuMemory.View, DistributionInfo.P1, DistributionInfo.P2);
@@ -380,7 +380,7 @@ namespace NSS.GPU
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void UniformKernel(Index1D index, ArrayView<float> data, float scale, float mean)
         {
-            data[index] = data[index] * scale + mean;
+            data[index] = (data[index] - 0.5f) * scale * 2 + mean;
         }
 
         [Pure]

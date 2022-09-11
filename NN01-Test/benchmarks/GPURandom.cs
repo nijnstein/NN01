@@ -25,8 +25,8 @@ namespace Test
         public void InitBuffer()
         {
             rnd = new GPURandom(RandomDistributionInfo.Uniform(0, 1), 128 * 2048, 3, null);
-            rndgauss = new GPURandom(RandomDistributionInfo.Gaussian(0, 1), 128 * 2048, 3, null);
-            rndnormal = new GPURandom(RandomDistributionInfo.Gaussian(0, 1), 128 * 2048, 3, null);
+            rndgauss = new GPURandom(RandomDistributionInfo.LogNormal(0, 1), 128 * 2048, 3, null);
+            rndnormal = new GPURandom(RandomDistributionInfo.LogNormal(0, 1), 128 * 2048, 3, null);
             cpurnd = new Random();
             block = new float[BlockSize];
         }

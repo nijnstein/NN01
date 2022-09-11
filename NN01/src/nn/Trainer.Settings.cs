@@ -27,13 +27,14 @@ namespace NN01
             /// <summary>
             /// learning rate
             /// </summary>
-            public float LearningRate = 0.01f;
+            public float LearningRate = 0.03f;
+            public float BatchedLearningRate = 0.15f;
 
             /// <summary>
             /// chance of a single neurons weight to change
             /// - this is not a percentage and heavily depends on the random distribution used, if the random is higher it mutates
             /// </summary>
-            public float MutationChance { get; set; } = .27f;
+            public float MutationChance { get; set; } = .3f;
 
             public float MaximalMutationChance { get; set; } = .85f;
             public float MinimalMutationChance { get; set; } = .05f;
@@ -41,7 +42,7 @@ namespace NN01
             /// <summary>
             /// strenght of any mutation if it occurs 
             /// </summary>
-            public float BiasMutationStrength { get; set; } = 0.1f;
+            public float BiasMutationStrength { get; set; } = 0.06f;
 
             /// <summary>
             /// strenght of any mutation if it occurs 
@@ -127,14 +128,19 @@ namespace NN01
                 {
                     float fittness = 0;
                     int c = 0;
+                    object locker = new object();
                     for (int k = 0; k < samples.SampleCount; k++)
                     {
                         Span<float> output = network.FeedForward(samples.SampleData(k));
                         Span<float> label = samples.SampleExpectation(k);
 
-                        fittness += Intrinsics.SumSquaredDifferences(label, output);
+                        float f = Intrinsics.SumSquaredDifferences(label, output);
+                        lock (locker)
+                        {
+                            fittness += f;
+                        }
                     }
-                    return 1f - Math.Max(0f, Math.Min(1f, fittness / samples.SampleCount * samples.ClassCount));
+                    return 1f - Math.Max(0f, Math.Min(1f, fittness / (samples.SampleCount * samples.ClassCount)));
                 }
                 return float.NaN; 
             };

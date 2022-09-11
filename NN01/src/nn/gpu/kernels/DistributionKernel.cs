@@ -28,7 +28,6 @@ namespace NN01
                 case LayerInitializationType.Zeros: return ZeroFillGPUKernel;
                 case LayerInitializationType.Ones: return OneFillGPUKernel;
                 case LayerInitializationType.Uniform: return UniformGPUKernel;
-                case LayerInitializationType.Gaussian: return GaussianGPUKernel;
                 case LayerInitializationType.Normal: return NormalGPUKernel;
 
                 default:
@@ -45,7 +44,6 @@ namespace NN01
                 case LayerInitializationType.Zeros: return ZeroFillCPUKernel;
                 case LayerInitializationType.Ones: return OneFillCPUKernel;
                 case LayerInitializationType.Uniform: return UniformCPUKernel;
-                case LayerInitializationType.Gaussian: return GaussianCPUKernel;
                 case LayerInitializationType.Normal: return NormalCPUKernel;
 
                 default:

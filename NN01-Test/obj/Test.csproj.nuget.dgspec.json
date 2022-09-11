@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Repo\\NN01\\NN01\\NN01-Test\\Test.csproj": {}
+    "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01-Test\\Test.csproj": {}
   },
   "projects": {
-    "C:\\Repo\\NN01\\NN01\\NN01-Test\\Test.csproj": {
+    "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01-Test\\Test.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Repo\\NN01\\NN01\\NN01-Test\\Test.csproj",
+        "projectUniqueName": "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01-Test\\Test.csproj",
         "projectName": "Test",
-        "projectPath": "C:\\Repo\\NN01\\NN01\\NN01-Test\\Test.csproj",
+        "projectPath": "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01-Test\\Test.csproj",
         "packagesPath": "C:\\Users\\Rob Lemmens\\.nuget\\packages\\",
-        "outputPath": "C:\\Repo\\NN01\\NN01\\NN01-Test\\obj\\",
+        "outputPath": "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01-Test\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -33,8 +33,8 @@
           "net6.0": {
             "targetAlias": "net6.0",
             "projectReferences": {
-              "C:\\Repo\\NN01\\NN01\\NN01\\NN01.csproj": {
-                "projectPath": "C:\\Repo\\NN01\\NN01\\NN01\\NN01.csproj"
+              "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01\\NN01.csproj": {
+                "projectPath": "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01\\NN01.csproj"
               }
             }
           }
@@ -86,14 +86,14 @@
         }
       }
     },
-    "C:\\Repo\\NN01\\NN01\\NN01\\NN01.csproj": {
+    "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01\\NN01.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Repo\\NN01\\NN01\\NN01\\NN01.csproj",
+        "projectUniqueName": "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01\\NN01.csproj",
         "projectName": "NN01",
-        "projectPath": "C:\\Repo\\NN01\\NN01\\NN01\\NN01.csproj",
+        "projectPath": "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01\\NN01.csproj",
         "packagesPath": "C:\\Users\\Rob Lemmens\\.nuget\\packages\\",
-        "outputPath": "C:\\Repo\\NN01\\NN01\\NN01\\obj\\",
+        "outputPath": "C:\\Repo\\NN01\\NN01_backup_gpunet\\NN01\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

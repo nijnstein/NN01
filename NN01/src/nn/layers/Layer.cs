@@ -29,7 +29,7 @@ namespace NN01
         public int Size;
         public int PreviousSize;
 
-        internal float[][] WeightDeltas;
+        internal float[,] WeightDeltas;
         internal float[] BiasDeltas;
 
         public bool IsInput => PreviousSize == 0;
@@ -101,6 +101,14 @@ namespace NN01
         public abstract void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target);
         public abstract void Derivate(Span<float> input, Span<float> output);
 
+
+        /// <summary>
+        /// generate different distributions from a uniform random number generator 
+        /// uniform -1..0..1
+        /// </summary>
+        /// <param name="initializer"></param>
+        /// <param name="data"></param>
+        /// <param name="random"></param>
         private void InitializeDistribution(LayerInitializationType initializer, Span<float> data, IRandom random)
         {
             switch (initializer)
@@ -113,78 +121,59 @@ namespace NN01
                 case LayerInitializationType.Random:
                     {
                         for (int i = 0; i < data.Length; i++)
-                        {
-                            data[i] = (random.NextSingle() - 0.5f) * 0.1f;
+                        {            
+                            data[i] = MathF.Abs(random.NextSingle());
                         }
                     }
                     break;
 
                 case LayerInitializationType.Normal:
                     {
-                        if (random.DistributionType == RandomDistributionType.Normal)
+                        for (int i = 0; i < data.Length; i++)
                         {
-                            for (int i = 0; i < data.Length; i++)
-                            {
-                                data[i] = random.Range(0f, 0.1f);
-                            }
-                        }
-                        else
-                        {
-                            for (int i = 0; i < data.Length; i++)
-                            {
-                                data[i] = MathEx.CDFNormal(random.Range(0f, 1f), 0, .1f);
-                            }
+                            data[i] = MathF.Abs(RandomDistributionInfo.NormalKernel(
+                                random.NextSingle(), random.NextSingle(), 
+                                0, 1, 0));
                         }
                     }
                     break;
 
-                case LayerInitializationType.Gaussian:
+                case LayerInitializationType.Glorot:
                     {
-                        if (random.DistributionType == RandomDistributionType.Gaussian)
+                        for (int i = 0; i < data.Length; i++)
                         {
-                            for (int i = 0; i < data.Length; i++)
-                            {
-                                data[i] = random.Range(0f, 0.1f);
-                            }
-                        }
-                        else
-                        {
-                            for (int i = 0; i < data.Length; i++)
-                            {
-                                data[i] = Random.Shared.Gaussian(0, .1f);
-                            }
+                            data[i] = MathF.Abs(RandomDistributionInfo.GlorotKernel(
+                                random.NextSingle(), random.NextSingle(),
+                                0f, 1f, Size + PreviousSize));
                         }
                     }
                     break;
 
                 case LayerInitializationType.HeNormal:
                     {
-                        if (PreviousSize == 0)
+                        for (int i = 0; i < data.Length; i++)
                         {
-                            // reduce to random 
-                            goto case LayerInitializationType.Normal;
+                            data[i] = MathF.Abs(RandomDistributionInfo.HeNormalKernel(
+                                random.NextSingle(), random.NextSingle(),
+                                0, 1, Size));
                         }
-                        else
+                    }
+                    break;
+
+                case LayerInitializationType.Xavier:
+                    {
+                        for (int i = 0; i < data.Length; i++)
                         {
-                            // use the size of input to weights as base for sd centered around mean 0
+                            data[i] = RandomDistributionInfo.XavierKernel(random.NextSingle(), PreviousSize);
+                        }
+                    }
+                    break;
 
-                            //float fan_inout = (float)PreviousSize * (float)Math.Sqrt(1f / ((PreviousSize + Size) / 2));
-                            float fan = PreviousSize * (float)Math.Sqrt(1f / PreviousSize);
-
-                            if (random.DistributionType == RandomDistributionType.Normal)
-                            {
-                                for (int i = 0; i < data.Length; i++)
-                                {
-                                    data[i] = random.Range(0f, fan);
-                                }
-                            }
-                            else
-                            {
-                                for (int i = 0; i < data.Length; i++)
-                                {
-                                    data[i] = MathEx.CDFNormal(random.Range(0f, 1f), 0, fan);
-                                }
-                            }
+                case LayerInitializationType.XavierNormalized:
+                    {
+                        for (int i = 0; i < data.Length; i++)
+                        {
+                            data[i] = RandomDistributionInfo.XavierNormalizedKernel(random.NextSingle(), PreviousSize, Size);
                         }
                     }
                     break;
@@ -202,13 +191,7 @@ namespace NN01
             if (!IsInput)
             {
                 BiasDeltas = new float[Size];
-                BiasDeltas.Zero();
-                WeightDeltas = (IsInput ? null : new float[Size][])!;
-                for (int i = 0; i < Size; i++)
-                {
-                    WeightDeltas![i] = new float[PreviousSize];
-                    WeightDeltas[i].Zero();
-                }
+                WeightDeltas = (IsInput ? null : new float[Size, PreviousSize])!;
             }
         }
 
@@ -287,9 +270,11 @@ namespace NN01
                     int jj = 0;
                     unchecked
                     {
+                        Span2D<float> wd = WeightDeltas.AsSpan2D<float>();
+
                         while (j < (previous.Size & ~7))
                         {
-                            Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(WeightDeltas![i]);
+                            Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(wd.Row(i));
 
                             Vector256<float> d = Avx.Multiply(prev[jj], gw);
                             w[jj] =
@@ -319,12 +304,12 @@ namespace NN01
                             // delta 
                             delta
                             // momentum 
-                            + (WeightDeltas![i][j] * momentum)
+                            + (WeightDeltas![i, j] * momentum)
                             // strengthen learned weights
 //                            + (weightLearningRate * (gamma[i] * weightCost * Weights[i][j]));  
                               + (weightLearningRate * (gamma[i] - weightCost * Weights[i, j]));  
 
-                        WeightDeltas[i][j] = delta;
+                        WeightDeltas[i, j] = delta;
 
                         j++;
                     }
@@ -357,11 +342,11 @@ namespace NN01
                             // delta 
                             delta
                             // momentum 
-                            + (WeightDeltas![i][j] * momentum)
+                            + (WeightDeltas![i, j] * momentum)
                             // strengthen learned weights
                             + (weightLearningRate * (gamma[i] - weightCost * Weights[i, j]));
 
-                        WeightDeltas[i][j] = delta;
+                        WeightDeltas[i, j] = delta;
 
                         j++;
                     }

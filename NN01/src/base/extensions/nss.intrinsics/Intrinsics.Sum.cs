@@ -177,6 +177,8 @@ namespace NSS
             return Avx.Max(partialMax, x1);
         }
 
+
+
         [Pure]
         [MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
         public static float SumSquaredDifferences(Span<float> a, float mean)

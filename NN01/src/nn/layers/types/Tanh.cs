@@ -15,12 +15,19 @@ namespace NN01
     public class TanhLayer : Layer
     {
         public override LayerActivationFunction ActivationType => LayerActivationFunction.Tanh;
+
+        //
+        //  for weights, use glorot, xavier etc.  but not a normal 
+        // 
+        //  tanh wants close to sum(all) == 1 
+        //
+
         public TanhLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
             : base
             (
                   size,
                   previousSize,
-                  weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
+                  weightInit == LayerInitializationType.Default ? LayerInitializationType.Xavier : weightInit,
                   biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
                   softmax,
                   skipInit, 
