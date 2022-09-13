@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
 
 namespace NSS
 {
@@ -20,6 +21,8 @@ namespace NSS
             width = bitCountWidth;
             height = bitCountHeight;
         }
+
+        public bool this[int x, int y] => this[x + y * BitWidth]; 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsSet(int x, int y) => buffer.IsBitSet(x + y * width);
@@ -92,6 +95,42 @@ namespace NSS
                 if (IsSet(x, y)) return false;
             }
             return true;
+        }
+
+        /// <summary>
+        /// slice buffer on row and transform into a one-hot encoded float vector
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Vector256<float> SliceRowToVector256(int i, int j)
+        {
+            return Vector256.Create(
+               IsSet(i, j + 0) ? 1f : 0f,
+               IsSet(i, j + 1) ? 1f : 0f,
+               IsSet(i, j + 2) ? 1f : 0f,
+               IsSet(i, j + 3) ? 1f : 0f,
+               IsSet(i, j + 4) ? 1f : 0f,
+               IsSet(i, j + 5) ? 1f : 0f,
+               IsSet(i, j + 6) ? 1f : 0f,
+               IsSet(i, j + 7) ? 1f : 0f
+            );
+        }
+
+        /// <summary>
+        /// slice buffer on column and transform into a one-hot encoded float vector
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Vector256<float> SliceColumnToVector256(int i, int j)
+        {
+            return Vector256.Create(
+               IsSet(i + 0, j) ? 1f : 0f,
+               IsSet(i + 1, j) ? 1f : 0f,
+               IsSet(i + 2, j) ? 1f : 0f,
+               IsSet(i + 3, j) ? 1f : 0f,
+               IsSet(i + 4, j) ? 1f : 0f,
+               IsSet(i + 5, j) ? 1f : 0f,
+               IsSet(i + 6, j) ? 1f : 0f,
+               IsSet(i + 7, j) ? 1f : 0f
+            );
         }
     }
 }

@@ -38,6 +38,13 @@ namespace NSS
             return (data & mask) == mask;
         }
 
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsSet(ulong data, byte index)
+        {
+            ulong mask = ((ulong)1 << index);
+            return (data & mask) == mask;
+        }
 
         /// <summary>
         /// threadsafe set-bit 

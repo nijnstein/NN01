@@ -13,6 +13,8 @@ namespace NSS
     public static partial class Intrinsics
     {
         static Vector256<float> v256_one = Vector256.Create(1f);
+        static Vector256<int> v256i_one = Vector256.Create(1f);
+
         static Vector256<float> v256_05 = Vector256.Create(0.5f);
         static Vector256<float> v256_minfloat = Vector256.Create(0x00800000).AsSingle();
         static Vector256<int> v256_0x7f = Vector256.Create((int)0x7f);

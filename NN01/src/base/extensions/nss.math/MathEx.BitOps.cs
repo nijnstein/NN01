@@ -234,6 +234,29 @@ namespace NSS
 		}
 
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitSet(this int data, byte index) => ThreadSafeBit.IsSet((uint)data, index);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitSet(this uint data, byte index) => ThreadSafeBit.IsSet(data, index);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitSet(this byte data, byte index) => ThreadSafeBit.IsSet(data, index);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitSet(this long data, byte index) => ThreadSafeBit.IsSet((ulong)data, index);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitSet(this ulong data, byte index) => ThreadSafeBit.IsSet(data, index);
 
-	}
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitZero(this int data, byte index) => !ThreadSafeBit.IsSet((uint)data, index);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitZero(this uint data, byte index) => !ThreadSafeBit.IsSet(data, index);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitZero(this byte data, byte index) => !ThreadSafeBit.IsSet(data, index);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitZero(this long data, byte index) => !ThreadSafeBit.IsSet((ulong)data, index);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static public bool IsBitZero(this ulong data, byte index) => !ThreadSafeBit.IsSet(data, index);
+
+
+    }
 }

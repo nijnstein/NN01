@@ -29,6 +29,8 @@ namespace NN01
         public int Size;
         public int PreviousSize;
 
+        public bool DontDropOutOnUpdate = false;
+
         internal float[,] WeightDeltas;
         internal float[] BiasDeltas;
 
@@ -201,7 +203,7 @@ namespace NN01
             if (BiasDeltas != null) BiasDeltas = null!;
         }
 
-        public void Update(Layer previous, float[] gamma, float weightLearningRate, float biasLearningRate, float momentum, float weightCost)
+        public void Update(Layer previous, float[] gamma, float weightLearningRate, float biasLearningRate, float momentum, float weightCost, BitBuffer2D? dropOut = null)
         {
             if (BiasDeltas == null || WeightDeltas == null)
             {
@@ -272,24 +274,56 @@ namespace NN01
                     {
                         Span2D<float> wd = WeightDeltas.AsSpan2D<float>();
 
-                        while (j < (previous.Size & ~7))
+                        if (dropOut != null 
+                            || dropOut.BitCount <= 0
+                            || DontDropOutOnUpdate
+                            )
                         {
-                            Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(wd.Row(i));
+                            while (j < (previous.Size & ~7))
+                            {
+                                Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(wd.Row(i));
 
-                            Vector256<float> d = Avx.Multiply(prev[jj], gw);
-                            w[jj] =
-                                Avx.Subtract(w[jj],
-                                // delta 
-                                Avx.Add(
-                                    Avx.Add(d, Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
-                                    // strengthen learned weights
-//                                    Avx.Multiply(wRate, Avx.Multiply(g, Avx.Multiply(wCost, w[jj])))
-                                    Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost, w[jj])))
-                                ));
+                                Vector256<float> d = Avx.Multiply(prev[jj], gw);
+                                w[jj] =
+                                    Avx.Subtract(w[jj],
+                                    // delta 
+                                    Avx.Add(
+                                        Avx.Add(d, Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
+                                        // strengthen learned weights
+                                        //                                    Avx.Multiply(wRate, Avx.Multiply(g, Avx.Multiply(wCost, w[jj])))
+                                        Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost, w[jj])))
+                                    ));
 
-                            wDelta[jj] = d;
-                            j += 8;
-                            jj++;
+                                wDelta[jj] = d;
+                                j += 8;
+                                jj++;
+                            }
+                        }
+                        else
+                        {
+                            // apply an extra multiplication and generate a dropout vector for each it.
+                            while (j < (previous.Size & ~7))
+                            {
+                                Vector256<float> drop = dropOut.SliceRowToVector256(i, j); 
+                                Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(wd.Row(i));
+
+                                Vector256<float> d = Avx.Multiply(prev[jj], gw);
+                                w[jj] =
+                                    // TODO should benchmarch which is faster... if(drop) or the mulitply always
+                                    Avx.Multiply(drop,
+                                    Avx.Subtract(w[jj],
+                                    // delta 
+                                    Avx.Add(
+                                        Avx.Add(d, Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
+                                        // strengthen learned weights
+                                        //                                    Avx.Multiply(wRate, Avx.Multiply(g, Avx.Multiply(wCost, w[jj])))
+                                        Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost, w[jj])))
+                                    )));
+
+                                wDelta[jj] = d;
+                                j += 8;
+                                jj++;
+                            }
                         }
                     }
                 }
@@ -298,19 +332,21 @@ namespace NN01
                     // calc the rest with scalar math
                     while (j < previous.Size)
                     {
-                        float delta = previous.Neurons[j] * gamma[i] * weightLearningRate;
+                        if (dropOut == null || !dropOut[i, j] || DontDropOutOnUpdate)
+                        {
+                            float delta = previous.Neurons[j] * gamma[i] * weightLearningRate;
 
-                        Weights[i, j] -=
-                            // delta 
-                            delta
-                            // momentum 
-                            + (WeightDeltas![i, j] * momentum)
-                            // strengthen learned weights
-//                            + (weightLearningRate * (gamma[i] * weightCost * Weights[i][j]));  
-                              + (weightLearningRate * (gamma[i] - weightCost * Weights[i, j]));  
+                            Weights[i, j] -=
+                                // delta 
+                                delta
+                                // momentum 
+                                + (WeightDeltas![i, j] * momentum)
+                                  // strengthen learned weights
+                                  //                            + (weightLearningRate * (gamma[i] * weightCost * Weights[i][j]));  
+                                  + (weightLearningRate * (gamma[i] - weightCost * Weights[i, j]));
 
-                        WeightDeltas[i, j] = delta;
-
+                            WeightDeltas[i, j] = delta;
+                        }
                         j++;
                     }
                 }
@@ -320,7 +356,7 @@ namespace NN01
         /// <summary>
         /// the easy to read version
         /// </summary>
-        public void UpdateOnCPU(Layer previous, float[] gamma, float weightLearningRate, float biasLearningRate, float momentum, float weightCost)
+        public void UpdateOnCPU(Layer previous, float[] gamma, float weightLearningRate, float biasLearningRate, float momentum, float weightCost, BitBuffer2D? dropOut = null)
         {
             // calculate new weights and biases for the last layer in the network 
             for (int i = 0; i < Size; i++)
@@ -336,18 +372,20 @@ namespace NN01
                     // calc the rest with scalar math
                     while (j < previous.Size)
                     {
-                        delta = previous.Neurons[j] * gamma[i] * weightLearningRate;
+                        if (dropOut == null || !dropOut[i, j] || DontDropOutOnUpdate)
+                        {
+                            delta = previous.Neurons[j] * gamma[i] * weightLearningRate;
 
-                        Weights[i, j] -=
-                            // delta 
-                            delta
-                            // momentum 
-                            + (WeightDeltas![i, j] * momentum)
-                            // strengthen learned weights
-                            + (weightLearningRate * (gamma[i] - weightCost * Weights[i, j]));
+                            Weights[i, j] -=
+                                // delta 
+                                delta
+                                // momentum 
+                                + (WeightDeltas![i, j] * momentum)
+                                // strengthen learned weights
+                                + (weightLearningRate * (gamma[i] - weightCost * Weights[i, j]));
 
-                        WeightDeltas[i, j] = delta;
-
+                            WeightDeltas[i, j] = delta;
+                        }
                         j++;
                     }
                 }
