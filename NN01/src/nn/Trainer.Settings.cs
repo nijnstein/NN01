@@ -102,6 +102,11 @@ namespace NN01
             public bool SoftMax { get; set; } = false;
 
             /// <summary>
+            /// weight dropout factor 
+            /// </summary>
+            public float DropOutFactor { get; set; } = 0.01f; 
+
+            /// <summary>
             /// if enabled uses the power of the gpu 
             /// </summary>                           
             public bool GPU { get; set; } = false;

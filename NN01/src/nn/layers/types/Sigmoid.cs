@@ -28,11 +28,8 @@ namespace NN01
         }
         public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
         {
-            Span<float> values = stackalloc float[previous.Size];
             Span2D<float> w = Weights.AsSpan2D<float>();
-
-            Span<float> values2 = stackalloc float[Size];
-            Span<float> values3 = stackalloc float[Size];
+            Span<float> values = stackalloc float[Size];
 
             unchecked
             {
@@ -40,13 +37,13 @@ namespace NN01
                 {
                     // weighted sum of (w[j][k] * n[i][k])
                     // apply bias
-                    values2[j] = Intrinsics.Sum(Intrinsics.Multiply(w.Row(j), inputData, values)) + Biases[j];
+                    values[j] = Intrinsics.SumWeighted(w.Row(j), inputData);
                 }
             }
-
-            Intrinsics.Exp(values2, values2);
-            Intrinsics.AddScalar(values2, 1, outputData);
-            Intrinsics.Divide(values2, outputData, outputData);
+            Intrinsics.Add(values, Biases, values); 
+            Intrinsics.Exp(values, values);
+            Intrinsics.AddScalar(values, 1, outputData);
+            Intrinsics.Divide(values, outputData, outputData);
             // for (int j = 0; j < Size; j++)
             // {
             //     // sigmoid activation
@@ -70,11 +67,6 @@ namespace NN01
 
             Intrinsics.SubstractScalar(1f, input, output); // 1 - target
             Intrinsics.Multiply(input, output, output); // output = target * (1-target)
-
-           // for (int j = 0; j < Size; j++)
-           // {
-           //     output[j] = ActivationFunctions.SigmoidDerivative(input[j]);
-           // }
         }
 
 
@@ -85,17 +77,9 @@ namespace NN01
             Debug.Assert(target.Length == Size);
 
             // gamma == difference times  activationDerivative(neuron value)
-
-            //Span<float> values = stackalloc float[Size];
-
             Intrinsics.SubstractScalar(1f, target, gamma); // 1 - target
             Intrinsics.Multiply(target, gamma, gamma); // target * (1-target)
             Intrinsics.Multiply(delta, gamma, gamma); // gamma = delta * (target * (1-target))
-
-            //for (int i = 0; i < Size; i++)
-            //{
-                //gamma[i] = delta[i] * (target[i] * (1f - target[i]));
-            //};
         }
     }
 }

@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -28,6 +30,46 @@ namespace NSS
             }
 
             return b; 
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsBitSet(this int[] a, int bit_index)
+        {
+            int index = bit_index >> 5;
+            int bit = 1 << (bit_index & 31);
+            byte mask = (byte)(1 << (byte)index);
+            return (a[index] & mask) == mask;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void EnableBit(this int[] a, int bit_index)
+        {
+            int index = bit_index >> 5;
+            int bit = 1 << (bit_index & 31);
+            int mask = 1 << index;
+            a[index] = a[index] | mask;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void DisableBit(this int[] a, int bit_index)
+        {
+            int index = bit_index >> 5;
+            int bit = 1 << (bit_index & 31);
+            int mask = 1 << index;
+            a[index] = a[index] & ~mask;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void SetBit(this int[] a, int bit_index, bool value)
+        {
+            int index = bit_index >> 5;
+            int bit = 1 << (bit_index & 31);
+            int mask = 1 << index;
+            a[index] = value ? a[index] | mask : a[index] & ~mask;
         }
 
     }

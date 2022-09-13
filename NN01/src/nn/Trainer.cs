@@ -15,11 +15,22 @@ namespace NN01
 {
     public partial class Trainer
     {
-        private int istep;
-        private float currentMomentum;
-        private float currentWeightCost;
+        public class TrainerInfo
+        {
+            public int step;
+            public float weightLearningRate;
+            public float biasLearningRate;
+            public float currentMomentum;
+            public float currentWeightCost;
 
-      
+            // if drop out is enabled, then each network uses these bitmaps to dropout weights 
+            public BitBuffer2D[] dropOutLayers; 
+
+            public SampleSet trainingSet;
+            public SampleSet testSet;
+            public Settings settings; 
+        }
+
         public static int Train(
             NeuralNetwork network,
             SampleSet trainingSamples, 
@@ -54,9 +65,17 @@ namespace NN01
                 networks.Add(new NeuralNetwork(network, settings.Random));
             }
 
-            int istep = 0;
-            float currentMomentum = settings.InitialMomentum;
-            float currentWeightCost = settings.InitialWeightCost;
+            TrainerInfo info = new TrainerInfo()
+            {
+                settings = settings,
+                step = 0,
+                currentMomentum = settings.InitialMomentum,
+                currentWeightCost = settings.InitialWeightCost,
+                weightLearningRate = settings.LearningRate,
+                biasLearningRate = settings.LearningRate,
+                testSet = testSamples,
+                trainingSet = trainingSamples
+            };
 
             NeuralNetwork best = new NeuralNetwork(network, true);
             best.Fitness = 0;
@@ -72,14 +91,14 @@ namespace NN01
                 settings.OnStep(network, -1, false, 0, (float)sw.Elapsed.TotalMilliseconds, 0);
             }
 
-            for (; istep < settings.Steps; istep++)
+            for (; info.step < settings.Steps; info.step++)
             {
                 if (sw != null)
                 {
                     sw.Reset();
                     sw.Start();
                 }
-                bool batched = /*istep > 0 &&*/ ((istep < settings.BatchedStartSteps) || !settings.OnlineTraining);
+                bool batched = /*istep > 0 &&*/ ((info.step < settings.BatchedStartSteps) || !settings.OnlineTraining);
                 int mutationCount = 0;
 
 
@@ -94,7 +113,7 @@ namespace NN01
                     {
                         mutationCount = Interlocked.Add(
                             ref mutationCount,
-                            Step(network, trainingSamples, testSamples, settings, settings.Random, networks, istep, currentMomentum, batched, j));
+                            Step(network, info, settings.Random, networks, batched, j));
                     });
 #endif
                                     
@@ -113,7 +132,7 @@ namespace NN01
                 networks.Sort();
 
                 // skip ready estimation and mutation if this is the last training step 
-                if (istep < settings.Steps - 1)
+                if (info.step < settings.Steps - 1)
                 {
                     // check if the one of the best n% networks passes the ready test 
                     if (EstimateIfReady(network, settings.ReadyEstimator, settings, networks))
@@ -123,16 +142,18 @@ namespace NN01
                 }
 
                 // update momemtum 
-                currentMomentum = (settings.FinalMomentum > settings.InitialMomentum) ?
-                    Math.Min(settings.FinalMomentum, currentMomentum * settings.MomentumChange)
+                info.currentMomentum = (settings.FinalMomentum > settings.InitialMomentum) ?
+                    Math.Min(settings.FinalMomentum, info.currentMomentum * settings.MomentumChange)
                     :
-                    Math.Max(settings.FinalMomentum, currentMomentum * settings.MomentumChange);
+                    Math.Max(settings.FinalMomentum, info.currentMomentum * settings.MomentumChange);
 
                 // update weight resistance 
-                currentWeightCost = (settings.FinalWeightCost > settings.InitialWeightCost) ?
-                    Math.Min(settings.FinalWeightCost, currentWeightCost * settings.WeightCostChange)
+                info.currentWeightCost = (settings.FinalWeightCost > settings.InitialWeightCost) ?
+                    Math.Min(settings.FinalWeightCost, info.currentWeightCost * settings.WeightCostChange)
                     :
-                    Math.Max(settings.FinalWeightCost, currentWeightCost * settings.WeightCostChange);
+                    Math.Max(settings.FinalWeightCost, info.currentWeightCost * settings.WeightCostChange);
+
+
 
 
                 // keep best network around
@@ -150,25 +171,23 @@ namespace NN01
                 }
 
                 float populationError = networks.Average(x => x.Fitness);//.Square());
-
-
+           
                 // notify 
                 if (settings.OnStep != null)
                 {
                     sw.Stop();
-                    settings.OnStep(networks[settings.Population - 1], istep, batched, populationError, (float)sw.Elapsed.TotalMilliseconds, mutationCount);
+                    settings.OnStep(networks[settings.Population - 1], info.step, batched, populationError, (float)sw.Elapsed.TotalMilliseconds, mutationCount);
                 }
             }
 
             // reaching here implies that the last network is the best we could train
             networks[settings.Population - 1].DeepClone(network);
 
-        ready:
-           
-            return istep;
+        ready:                  
+            return info.step;
         }
 
-        private static int Step(NeuralNetwork network, SampleSet trainingSamples, SampleSet testSamples, Settings? settings, IRandom random, List<NeuralNetwork> networks, int istep, float currentMomentum, bool batched, int j)
+        private static int Step(NeuralNetwork network, TrainerInfo info, IRandom random, List<NeuralNetwork> networks, bool batched, int j)
         {
             int mutationCount = 0;
 
@@ -179,7 +198,7 @@ namespace NN01
                 // mutate population member if:
                 // - not on the first step 
                 // - located in bad half 
-                mutationCount = MutatePopulationMember(settings, random, networks, istep, j);
+                mutationCount = MutatePopulationMember(info.settings, random, networks, info.step, j);
 
                 // setup buffers
                 float[][] gamma = new float[network.LayerCount][];
@@ -190,43 +209,45 @@ namespace NN01
 
                 // backprop: one sample at a time (online training)
                 float cost = 0;
-                int sampleCount = Math.Min((int)(settings.MiniBatchSize > 0 ? settings.MiniBatchSize : trainingSamples.SampleCount), trainingSamples.SampleCount);
+                int sampleCount = Math.Min((int)(info.settings.MiniBatchSize > 0 ? info.settings.MiniBatchSize : info.trainingSet.SampleCount), info.trainingSet.SampleCount);
                 for (int k = 0; k < sampleCount; k++)
                 {
                     networks[j].BackPropagateOnline(
-                        trainingSamples.ShuffledData(k),
-                        trainingSamples.ShuffledExpectation(k),
+                        info.trainingSet.ShuffledData(k),
+                        info.trainingSet.ShuffledExpectation(k),
                         gamma,
-                        settings.LearningRate,
-                        settings.LearningRate,
-                        currentMomentum,
+                        info.settings.LearningRate,
+                        info.settings.LearningRate,
+                        info.currentMomentum,
                         1E-05f, 1E-07F);
 
-                    trainingSamples.Samples[trainingSamples.ShuffledSample(k).Index].Cost = networks[(int)j].Cost;
+                    info.trainingSet.Samples[info.trainingSet.ShuffledSample(k).Index].Cost = networks[(int)j].Cost;
                     cost += networks[(int)j].Cost;
                 }
-                networks[(int)j].Cost = Math.Min(0.999999f, cost / (float)sampleCount * trainingSamples.ClassCount * trainingSamples.Variance);
+                networks[(int)j].Cost = Math.Min(
+                    0.999999f, 
+                    cost / (float)sampleCount * info.trainingSet.ClassCount * info.trainingSet.Variance);
             }
             else
             {
-                mutationCount = MutatePopulationMember(settings, random, networks, istep, j);
+                mutationCount = MutatePopulationMember(info.settings, random, networks, info.step, j);
 
                 // batched training 
                 // networks[j].
                 networks[j].BackPropagateBatchCPU(
                     j,
-                    trainingSamples,
-                    settings.BatchedLearningRate,// * (settings.SoftMax ? 1f : 5f), 
-                    settings.BatchedLearningRate,// * (settings.SoftMax ? 1f : 5f), 
-                    currentMomentum,
+                    info.trainingSet,
+                    info.settings.BatchedLearningRate,// * (settings.SoftMax ? 1f : 5f), 
+                    info.settings.BatchedLearningRate,// * (settings.SoftMax ? 1f : 5f), 
+                    info.currentMomentum,
                     1E-05f, 1E-07F,
-                    null);
+                    random);
             }
 
             networks[(int)j].Fitness =
-                settings.FitnessEstimator(networks[(int)j], trainingSamples)
+                info.settings.FitnessEstimator(networks[(int)j], info.trainingSet)
                 *
-                settings.FitnessEstimator(networks[j], testSamples);
+                info.settings.FitnessEstimator(networks[j], info.testSet);
 
             return mutationCount;
         }
@@ -262,7 +283,6 @@ namespace NN01
                     return true;
                 }
             }
-
             return false;
         }
 

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.Contracts;
+﻿using ILGPU.IR;
+using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -122,6 +123,46 @@ namespace NSS
         }
 
 
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsBitSet(this Span<int> a, int bit_index)
+        {
+            int index = bit_index >> 5;
+            int bit = 1 << (bit_index & 31);
+            byte mask = (byte)(1 << (byte)index);
+            return (a[index] & mask) == mask;
+        }
 
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void EnableBit(this Span<int> a, int bit_index)
+        {
+            int index = bit_index >> 5;
+            int bit = 1 << (bit_index & 31);
+            int mask = 1 << index;
+            a[index] = a[index] | mask;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void DisableBit(this Span<int> a, int bit_index)
+        {
+            int index = bit_index >> 5;
+            int bit = 1 << (bit_index & 31);
+            int mask = 1 << index;
+            a[index] = a[index] & ~mask;
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void SetBit(this Span<int> a, int bit_index, bool value)
+        {
+            int index = bit_index >> 5;
+            int bit = 1 << (bit_index & 31);
+            int mask = 1 << index;
+            a[index] = value ? a[index] | mask : a[index] & ~mask;
+        }
+
+   
     }
 }
