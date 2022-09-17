@@ -8,9 +8,9 @@ namespace NN01
 {
     static public class BinaryReaderExtensions
     {
-        static public LayerActivationFunction ReadLayerActivationFunction(this BinaryReader r)
+        static public LayerType ReadLayerActivationFunction(this BinaryReader r)
         {
-            return (LayerActivationFunction)r.ReadByte();
+            return (LayerType)r.ReadByte();
         }
         static public LayerInitializationType ReadLayerInitializer(this BinaryReader r)
         {
@@ -21,12 +21,12 @@ namespace NN01
             int size = r.ReadInt32();
             int previousSize = r.ReadInt32();
 
-            LayerActivationFunction act = r.ReadLayerActivationFunction();
+            LayerType act = r.ReadLayerActivationFunction();
             LayerInitializationType biasInit = r.ReadLayerInitializer();
             LayerInitializationType weightInit = r.ReadLayerInitializer();
 
-            Layer layer = NeuralNetwork.CreateLayer(size, previousSize, act, weightInit, biasInit, true);
-
+            Layer layer = NeuralNetwork.CreateLayer(size, previousSize, act, true);
+         /*
             if (previousSize > 0) // == IsInput 
             {
                 for (int i = 0; i < size; i++)
@@ -41,7 +41,7 @@ namespace NN01
                     }
                 }
             }
-
+           */
             return layer;
         }
 

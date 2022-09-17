@@ -8,6 +8,6 @@ namespace NN01
 {
     public enum LayerConnectedness : byte
     {
-        Full, Single
+        Full, Convolutions
     }
 }

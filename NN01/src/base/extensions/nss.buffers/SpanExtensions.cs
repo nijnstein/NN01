@@ -1,4 +1,5 @@
 ﻿using ILGPU.IR;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -22,6 +23,20 @@ namespace NSS
                 span,
                 array.GetLength(0),
                 array.GetLength(1)
+            );
+        }
+
+        [MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+        public static Span2D<T> AsSpan2D<T>(this Array array, int rows, int columns) where T : struct
+        {
+            Debug.Assert(array.Length == rows * columns, "input array size mismatches with given row and columncount");
+
+            Span<T> span = MemoryMarshal.CreateSpan(ref Unsafe.As<byte, T>(ref MemoryMarshal.GetArrayDataReference(array)), array.Length);
+
+            return new Span2D<T>(
+                span,
+                rows,
+                columns
             );
         }
 
@@ -121,7 +136,81 @@ namespace NSS
             }
             return a;
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Span<float> Fill(this Span<float> a, float f)
+        {
+            unchecked
+            {
+                int i = 0;
+                while (i < (a.Length & ~7))
+                {
+                    a[i + 0] = f;
+                    a[i + 1] = f;
+                    a[i + 2] = f;
+                    a[i + 3] = f;
+                    a[i + 4] = f;
+                    a[i + 5] = f;
+                    a[i + 6] = f;
+                    a[i + 7] = f;
+                    i += 8;
+                }
+                while (i < a.Length)
+                {
+                    a[i++] = f;
+                }
+            }
+            return a;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Span<int> Fill(this Span<int> a, int f)
+        {
+            unchecked
+            {
+                int i = 0;
+                while (i < (a.Length & ~7))
+                {
+                    a[i + 0] = f;
+                    a[i + 1] = f;
+                    a[i + 2] = f;
+                    a[i + 3] = f;
+                    a[i + 4] = f;
+                    a[i + 5] = f;
+                    a[i + 6] = f;
+                    a[i + 7] = f;
+                    i += 8;
+                }
+                while (i < a.Length)
+                {
+                    a[i++] = f;
+                }
+            }
+            return a;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Span<uint> Fill(this Span<uint> a, uint f)
+        {
+            unchecked
+            {
+                int i = 0;
+                while (i < (a.Length & ~7))
+                {
+                    a[i + 0] = f;
+                    a[i + 1] = f;
+                    a[i + 2] = f;
+                    a[i + 3] = f;
+                    a[i + 4] = f;
+                    a[i + 5] = f;
+                    a[i + 6] = f;
+                    a[i + 7] = f;
+                    i += 8;
+                }
+                while (i < a.Length)
+                {
+                    a[i++] = f;
+                }
+            }
+            return a;
+        }
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

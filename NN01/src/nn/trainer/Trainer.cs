@@ -1,4 +1,5 @@
 ﻿using ILGPU.Runtime;
+using ILGPU.Runtime.Cuda;
 using NSS;
 using NSS.GPU;
 using NSS.Neural;
@@ -28,7 +29,10 @@ namespace NN01
 
             public SampleSet trainingSet;
             public SampleSet testSet;
-            public Settings settings; 
+            public Settings settings;
+
+            public Accelerator accelerator;
+            public GpuNetworkDataHost gpuDataHost; 
         }
 
         public static int Train(
@@ -52,7 +56,7 @@ namespace NN01
                 testSamples.CancelMeans();
             }
 
-            // prepare gpu (random + memory)  
+            // random 
             if (settings.Random == null)
             {
                 settings.Random = new CPURandom(RandomDistributionInfo.Uniform());
@@ -65,6 +69,7 @@ namespace NN01
                 networks.Add(new NeuralNetwork(network, settings.Random));
             }
 
+            GPUContext gpuContext = settings.GPU ? GPUContext.Create() : null;
             TrainerInfo info = new TrainerInfo()
             {
                 settings = settings,
@@ -74,8 +79,15 @@ namespace NN01
                 weightLearningRate = settings.LearningRate,
                 biasLearningRate = settings.LearningRate,
                 testSet = testSamples,
-                trainingSet = trainingSamples
+                trainingSet = trainingSamples,
+                accelerator = gpuContext != null ? gpuContext.CreateGPUAccelerator() : null
             };
+            if (info.accelerator != null)
+            {
+                trainingSamples.AllocateAndCopyToGPU(info.accelerator, info.settings.Population); 
+                testSamples.AllocateAndCopyToGPU(info.accelerator, info.settings.Population);
+                info.gpuDataHost = GpuNetworkDataHost.AllocatePopulation(info.accelerator, network, info.settings.Population); 
+            }
 
             NeuralNetwork best = new NeuralNetwork(network, true);
             best.Fitness = 0;
@@ -106,7 +118,7 @@ namespace NN01
 #if DEBUG
                     for (int j = 0; j < settings.Population; j++)
                     {
-                         mutationCount += Step(network, trainingSamples, testSamples, settings, settings.Random, networks, istep, currentMomentum, batched, j);
+                         mutationCount += Step(network, info, settings.Random, networks, batched, j);
                     }
 #else
                     Parallel.For(0, settings.Population, (j) =>
@@ -118,9 +130,8 @@ namespace NN01
 #endif
                                     
 
-                // shuffle training set 
-                // - no use if batched 
-              //  if (!batched)
+                // shuffle training set - no use if batched 
+                if (!batched)
                 {
                     trainingSamples.ShuffleIndices(settings.Random);
                 }
@@ -154,8 +165,6 @@ namespace NN01
                     Math.Max(settings.FinalWeightCost, info.currentWeightCost * settings.WeightCostChange);
 
 
-
-
                 // keep best network around
                 if (best.Fitness < networks[settings.Population - 1].Fitness)
                 {
@@ -183,13 +192,34 @@ namespace NN01
             // reaching here implies that the last network is the best we could train
             networks[settings.Population - 1].DeepClone(network);
 
-        ready:                  
+        ready:
+            if (settings.GPU)
+            {
+                info.gpuDataHost.ReleaseAllocation(); 
+                info.trainingSet.ReleaseGPU(info.accelerator);
+                info.testSet.ReleaseGPU(info.accelerator); 
+                info.accelerator.Dispose();
+                gpuContext.Dispose();
+            }
             return info.step;
         }
 
         private static int Step(NeuralNetwork network, TrainerInfo info, IRandom random, List<NeuralNetwork> networks, bool batched, int j)
         {
             int mutationCount = 0;
+
+            // randomize any dropout layer 
+            for (int i = 1; i < networks[j].LayerCount; i++)
+            {
+                if (networks[j][i].ActivationType == LayerType.Dropout)
+                {
+                    Dropout layer = networks[j][i] as Dropout; 
+                    if(layer != null)
+                    {
+                        layer.RandomizeDropout(random); 
+                    }
+                }
+            }
 
             // back propagate population
             // 
@@ -213,8 +243,8 @@ namespace NN01
                 for (int k = 0; k < sampleCount; k++)
                 {
                     networks[j].BackPropagateOnline(
-                        info.trainingSet.ShuffledData(k),
-                        info.trainingSet.ShuffledExpectation(k),
+                        info.trainingSet,
+                        k,
                         gamma,
                         info.settings.LearningRate,
                         info.settings.LearningRate,

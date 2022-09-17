@@ -8,7 +8,7 @@ namespace NN01
 {
     static public class BinaryWriterExtensions
     {
-        static public void Write(this BinaryWriter w, LayerActivationFunction activator)
+        static public void Write(this BinaryWriter w, LayerType activator)
         {
             w.Write((byte)activator);
         }
@@ -16,7 +16,7 @@ namespace NN01
         {
             w.Write((byte)initializer);
         }
-        static public void Write(this BinaryWriter w, Layer layer)
+        static public void Write(this BinaryWriter w, ParameterLayer layer)
         {
             w.Write(layer.Size);
             w.Write(layer.PreviousSize);
@@ -48,7 +48,7 @@ namespace NN01
             w.Write(nn.Cost);
             for (int i = 0; i < nn.LayerCount; i++)
             {
-                w.Write(nn[i]);
+              //  w.Write(nn[i]);
             }
         }
     }

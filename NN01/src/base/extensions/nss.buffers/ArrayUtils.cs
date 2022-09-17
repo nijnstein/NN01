@@ -32,6 +32,9 @@ namespace NSS
             return b; 
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Fill<T>(this T[] a, T b) => a.AsSpan().Fill(b);
+
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsBitSet(this int[] a, int bit_index)

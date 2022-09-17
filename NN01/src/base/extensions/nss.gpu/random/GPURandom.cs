@@ -10,8 +10,8 @@ namespace NSS.GPU
     /// </summary>
     public class GPURandom : IRandom, IDisposable
     {
-        public const int DefaultChunkCount = 4;
-        public const int DefaultChunkSize = 1024 * 256;
+        public const int DefaultChunkCount = 16;
+        public const int DefaultChunkSize = 1024 * 64;
 
         public RandomDistributionInfo Info => gpuProvider.DistributionInfo;
         public RandomDistributionType DistributionType => Info.DistributionType; 

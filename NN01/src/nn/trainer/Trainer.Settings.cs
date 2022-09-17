@@ -136,7 +136,7 @@ namespace NN01
                     object locker = new object();
                     for (int k = 0; k < samples.SampleCount; k++)
                     {
-                        Span<float> output = network.FeedForward(samples.SampleData(k));
+                        Span<float> output = network.FeedForward(samples.SampleData(k), true);
                         Span<float> label = samples.SampleExpectation(k);
 
                         float f = Intrinsics.SumSquaredDifferences(label, output);

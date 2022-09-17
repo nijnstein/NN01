@@ -25,7 +25,7 @@ namespace NN01
         public int LayerIndex = 0;
         public int LayerCount = 0;
 
-        public LayerActivationFunction ActivationType = LayerActivationFunction.None;
+        public LayerType ActivationType = LayerType.None;
         public LayerConnectedness Connectedness = LayerConnectedness.Full;
         public LayerInitializationType WeightInitializer = LayerInitializationType.Random;
         public LayerInitializationType BiasInitializer = LayerInitializationType.Random;

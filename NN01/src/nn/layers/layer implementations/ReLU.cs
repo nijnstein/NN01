@@ -12,20 +12,15 @@ using NSS;
 
 namespace NN01
 {
-    public class ReLuLayer : Layer
+    public class ReLuLayer : ParameterLayer
     {
-        public override LayerActivationFunction ActivationType => LayerActivationFunction.ReLU;
-        public ReLuLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
-            : base
-            (
-                  size, 
-                  previousSize, 
-                  weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
-                  biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
-                  softmax,
-                  skipInit,
-                  random
-            ) 
+        public override LayerType ActivationType => LayerType.ReLU;
+        public override LayerConnectedness Connectedness => LayerConnectedness.Full;
+        public override LayerInitializationType WeightInitializer => LayerInitializationType.HeNormal;
+        public override LayerInitializationType BiasInitializer => LayerInitializationType.dot01;
+
+        public ReLuLayer(int size, int previousSize, bool skipInit = false, IRandom random = null)
+            : base(size, previousSize, skipInit, random)
         { 
         }
 
@@ -43,24 +38,6 @@ namespace NN01
                 outputData[j] = Math.Max(value, 0);
             }
         }
-
-        /// <summary>
-        /// activate current from next layer (reversed activation) 
-        /// </summary>
-        public override void ReversedActivation(Layer next)
-        {
-            Span<float> values = stackalloc float[next.Size];
-            Span2D<float> w = Weights.AsSpan2D<float>();
-
-            for (int j = 0; j < Size; j++)
-            {
-                float value = Intrinsics.Sum(Intrinsics.Multiply(w.Row(j), next.Neurons, values)) - next.Biases[j];
-
-                // relu 
-                Neurons[j] = Math.Max(value, 0);
-            }
-        }
-
 
         /// <summary>
         /// get derivate of current activation state 

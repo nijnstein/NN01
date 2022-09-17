@@ -14,7 +14,7 @@ namespace NSS
     /// 
     /// changed to non-static + float support 
     /// </summary>
-    public class SimpleRNG
+    public sealed class SimpleRNG
     {
         private uint m_w;
         private uint m_z;

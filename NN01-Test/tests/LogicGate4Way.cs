@@ -57,10 +57,10 @@ namespace UnitTests
         {
             NeuralNetwork nn = new NeuralNetwork(
                 new int[] { 4, 16, 8, classCount },
-                new LayerActivationFunction[] {
-                    LayerActivationFunction.ReLU,
-                    LayerActivationFunction.LeakyReLU,
-                    LayerActivationFunction.LeakyReLU,
+                new LayerType[] {
+                    LayerType.ReLU,
+                    LayerType.LeakyReLU,
+                    LayerType.LeakyReLU,
                 }
             );
 

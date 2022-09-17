@@ -12,7 +12,7 @@ using System.Drawing.Printing;
 namespace NN01
 {
     public partial class NeuralNetwork
-    {
+    {   /*
 
         static void gpu_multiply_scalar(Index2D index, ArrayView2D<float, Stride2D.DenseX> a, float b)
             => a[index.X, index.Y] *= b;
@@ -420,7 +420,8 @@ namespace NN01
             //  - copy parameters from a better network...
             //  - mutate those parameters
             return 0; 
-        }
+        }     */
     }
+       
 }
 

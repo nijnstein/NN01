@@ -1,6 +1,6 @@
 ﻿namespace NSS
 {
-    public interface IRandom
+    public interface IRandom : IDisposable
     {
         RandomDistributionType DistributionType { get; }
         float NextSingle();

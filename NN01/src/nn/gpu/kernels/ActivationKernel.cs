@@ -24,20 +24,20 @@ namespace NN01
     {
       
 
-        public static Action<Index1D, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>> GetGPU(LayerActivationFunction activationFunction)
+        public static Action<Index1D, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>> GetGPU(LayerType activationFunction)
         {
                 switch (activationFunction)
                 {
-                    case LayerActivationFunction.ReLU: return ReLUGPUKernel;
+                    case LayerType.ReLU: return ReLUGPUKernel;
                 }
             return null;
         }
 
-        public static Action<Index1D, ArrayView<float>, ArrayView<float>, ArrayView2D<float, Stride2D.DenseX>, int> GetDerivateGPU(LayerActivationFunction activationFunction)
+        public static Action<Index1D, ArrayView<float>, ArrayView<float>, ArrayView2D<float, Stride2D.DenseX>, int> GetDerivateGPU(LayerType activationFunction)
         {
             switch (activationFunction)
                 {
-                    case LayerActivationFunction.ReLU: return ReLUDerivateGPUKernel;
+                    case LayerType.ReLU: return ReLUDerivateGPUKernel;
                 }
             return null;
         }

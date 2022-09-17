@@ -1,108 +1,56 @@
-﻿using ILGPU;
-using ILGPU.Runtime;
-using NSS;
-using System;
-using System.Collections.Generic;
+﻿using NSS;
 using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using System.Numerics;
-using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
-using System.Text;
-using System.Threading.Tasks;
+using System.Reflection;
 
 namespace NN01
 {
+
     public abstract class Layer
     {
-        public float[] Neurons;
-
-        public float[] Delta;   // error * derivate 
-        public float[] Gamma;   // derivate of activation
-
-
-        public float[,] Weights;
-        public float[] Biases;
-
         public int Size;
         public int PreviousSize;
 
-        public bool DontDropOutOnUpdate = false;
-
-        internal float[,] WeightDeltas;
-        internal float[] BiasDeltas;
-
+        public float[] Neurons;
+        public float[] Delta;   // error * derivate 
+        public float[] Gamma;   // derivate of activation
         public bool IsInput => PreviousSize == 0;
-        public bool Softmax { get; set; }
-
-        public abstract LayerActivationFunction ActivationType { get; }
-        //
-        //
-        //      Full - single  (later convolutions)  
-        //
-        //
-        public LayerConnectedness Connectedness { get; set; } = LayerConnectedness.Full;
-        public LayerInitializationType WeightInitializer { get; set; } = LayerInitializationType.Random;
-        public LayerInitializationType BiasInitializer { get; set; } = LayerInitializationType.dot01;
-
-        public Layer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Random, LayerInitializationType biasInit = LayerInitializationType.Random, bool softmax = false, bool skipInit = true, IRandom random = null)
+        public abstract LayerType ActivationType { get; }
+        public abstract LayerConnectedness Connectedness { get; }
+        public virtual bool HasParameters { get; } = false;
+        public Layer(int size, int previousSize)
         {
             Size = size;
             PreviousSize = previousSize;
             Neurons = new float[size];
-            Gamma = new float[size];    // if last then its used to store the activation before softmax if enabled 
-            Delta = new float[size]; 
-
-            WeightInitializer = weightInit;
-            BiasInitializer = biasInit;
-            Softmax = softmax;
-
-            if (!IsInput)
-            {
-                Biases = new float[size];
-                if (!skipInit)
-                {
-                    InitializeDistribution(BiasInitializer, Biases, random);
-                }
-
-                Weights = new float[size, previousSize];
-                if (!skipInit)
-                {
-                    InitializeDistribution(WeightInitializer, Weights.AsSpan2D<float>().Span, random);
-                }
-            }
-            else
-            {
-                Weights = null!;
-                WeightDeltas = null!;
-                Biases = null!;
-                BiasDeltas = null!;
-            }
-        }
-
-        public void Activate(Layer previous)
-        {
-            Activate(previous, previous.Neurons, Neurons);
-        }
-        public void Derivate(Span<float> output)
-        {
-            Derivate(Neurons, output); 
+            Gamma = new float[size];
+            Delta = new float[size];
         }
 
         public abstract void Activate(Layer previous, Span<float> inputData, Span<float> outputData);
-        public abstract void ReversedActivation(Layer next);
-
-        /// <summary>
-        /// gamma == backward activation of neuron -> derivate(state) 
-        /// </summary>
-        /// <param name="delta"></param>
-        /// <param name="gamma"></param>
-        /// <param name="target"></param>
         public abstract void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target);
         public abstract void Derivate(Span<float> input, Span<float> output);
+        
+        public virtual void Activate(Layer previous)
+        {
+            Activate(previous, previous.Neurons, Neurons);
+        }
+        
+        public virtual void Derivate(Span<float> output)
+        {
+            Derivate(Neurons, output);
+        }
+        
+        public virtual void Update(Layer previous, float[] gamma, float weightLearningRate, float biasLearningRate, float momentum, float weightCost)
+        {
+            Debug.Assert(Neurons != null);
+            Debug.Assert(previous != null && previous.Size == Size);
+            Buffer.BlockCopy(previous.Neurons, 0, Neurons, 0, Neurons.Length);
+        }
 
+        public virtual void PassThrough(Layer previous)
+        {
+            Buffer.BlockCopy(previous.Neurons, 0, Neurons, 0, Neurons.Length);
+        }
 
         /// <summary>
         /// generate different distributions from a uniform random number generator 
@@ -111,7 +59,7 @@ namespace NN01
         /// <param name="initializer"></param>
         /// <param name="data"></param>
         /// <param name="random"></param>
-        private void InitializeDistribution(LayerInitializationType initializer, Span<float> data, IRandom random)
+        protected void FillParameterDistribution(LayerInitializationType initializer, Span<float> data, IRandom random)
         {
             switch (initializer)
             {
@@ -123,7 +71,7 @@ namespace NN01
                 case LayerInitializationType.Random:
                     {
                         for (int i = 0; i < data.Length; i++)
-                        {            
+                        {
                             data[i] = MathF.Abs(random.NextSingle());
                         }
                     }
@@ -134,7 +82,7 @@ namespace NN01
                         for (int i = 0; i < data.Length; i++)
                         {
                             data[i] = MathF.Abs(RandomDistributionInfo.NormalKernel(
-                                random.NextSingle(), random.NextSingle(), 
+                                random.NextSingle(), random.NextSingle(),
                                 0, 1, 0));
                         }
                     }
@@ -188,208 +136,5 @@ namespace NN01
             }
         }
 
-        public void InitializeDeltaBuffers()
-        {
-            if (!IsInput)
-            {
-                BiasDeltas = new float[Size];
-                WeightDeltas = (IsInput ? null : new float[Size, PreviousSize])!;
-            }
-        }
-
-        private void DisposeDeltaBuffers()
-        {
-            if (WeightDeltas != null) WeightDeltas = null!;
-            if (BiasDeltas != null) BiasDeltas = null!;
-        }
-
-        public void Update(Layer previous, float[] gamma, float weightLearningRate, float biasLearningRate, float momentum, float weightCost, BitBuffer2D? dropOut = null)
-        {
-            if (BiasDeltas == null || WeightDeltas == null)
-            {
-                // these may not be initialized if the network is used for inference only 
-                InitializeDeltaBuffers();
-            }
-
-            Vector256<float> wRate;
-            Vector256<float> wCost;
-            Span<Vector256<float>> prev;
-            if (Avx.IsSupported)
-            {
-                wRate = Vector256.Create(weightLearningRate);
-                wCost = Vector256.Create(weightCost);
-                prev = MemoryMarshal.Cast<float, Vector256<float>>(previous.Neurons);
-            }
-            else
-            {
-                wRate = default;
-                wCost = default;
-                prev = default;
-            }
-
-            // update bias (avx)
-            if (Avx.IsSupported)
-            {
-                Span<Vector256<float>> b = MemoryMarshal.Cast<float, Vector256<float>>(Biases!);
-                Span<Vector256<float>> bDelta = MemoryMarshal.Cast<float, Vector256<float>>(BiasDeltas!);
-                Span<Vector256<float>> gi = MemoryMarshal.Cast<float, Vector256<float>>(gamma);
-                int i = 0, ii = 0;
-                while (i < (Size & ~7))
-                {
-                    Vector256<float> deltaBias = Avx.Multiply(gi[ii], Vector256.Create(biasLearningRate));
-                    b[ii] = Avx.Subtract(b[ii], Avx.Add(deltaBias, Avx.Multiply(bDelta[ii], Vector256.Create(momentum))));
-                    bDelta[ii] = deltaBias;
-                    ii += 1;
-                    i += 8;
-                }
-                while (i < Size)
-                {
-                    float delta = gamma[i] * biasLearningRate;
-                    Biases[i] -= delta + (BiasDeltas![i] * momentum);
-                    BiasDeltas![i] = delta;
-                    i++;
-                }
-            }
-
-            // calculate new weights and biases for the last layer in the network 
-            for (int i = 0; i < Size; i++)
-            {
-                if (!Avx.IsSupported)
-                {
-                    float delta = gamma[i] * biasLearningRate;
-                    Biases[i] -= delta + (BiasDeltas![i] * momentum);
-                    BiasDeltas![i] = delta;
-                }
-
-                // apply some learning... move in direction of result using gamma 
-                int j = 0;
-                if (Avx.IsSupported)
-                {
-                    Vector256<float> g = Vector256.Create(gamma[i]);
-                    Vector256<float> gw = Vector256.Create(gamma[i] * weightLearningRate);
-                    Span<Vector256<float>> w = MemoryMarshal.Cast<float, Vector256<float>>(Weights.AsSpan2D<float>().Row(i));
-
-                    int jj = 0;
-                    unchecked
-                    {
-                        Span2D<float> wd = WeightDeltas.AsSpan2D<float>();
-
-                        if (dropOut != null 
-                            || dropOut.BitCount <= 0
-                            || DontDropOutOnUpdate
-                            )
-                        {
-                            while (j < (previous.Size & ~7))
-                            {
-                                Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(wd.Row(i));
-
-                                Vector256<float> d = Avx.Multiply(prev[jj], gw);
-                                w[jj] =
-                                    Avx.Subtract(w[jj],
-                                    // delta 
-                                    Avx.Add(
-                                        Avx.Add(d, Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
-                                        // strengthen learned weights
-                                        //                                    Avx.Multiply(wRate, Avx.Multiply(g, Avx.Multiply(wCost, w[jj])))
-                                        Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost, w[jj])))
-                                    ));
-
-                                wDelta[jj] = d;
-                                j += 8;
-                                jj++;
-                            }
-                        }
-                        else
-                        {
-                            // apply an extra multiplication and generate a dropout vector for each it.
-                            while (j < (previous.Size & ~7))
-                            {
-                                Vector256<float> drop = dropOut.SliceRowToVector256(i, j); 
-                                Span<Vector256<float>> wDelta = MemoryMarshal.Cast<float, Vector256<float>>(wd.Row(i));
-
-                                Vector256<float> d = Avx.Multiply(prev[jj], gw);
-                                w[jj] =
-                                    // TODO should benchmarch which is faster... if(drop) or the mulitply always
-                                    Avx.Multiply(drop,
-                                    Avx.Subtract(w[jj],
-                                    // delta 
-                                    Avx.Add(
-                                        Avx.Add(d, Avx.Multiply(wDelta[jj], Vector256.Create(momentum))),
-                                        // strengthen learned weights
-                                        //                                    Avx.Multiply(wRate, Avx.Multiply(g, Avx.Multiply(wCost, w[jj])))
-                                        Avx.Multiply(wRate, Avx.Subtract(g, Avx.Multiply(wCost, w[jj])))
-                                    )));
-
-                                wDelta[jj] = d;
-                                j += 8;
-                                jj++;
-                            }
-                        }
-                    }
-                }
-                unchecked
-                {
-                    // calc the rest with scalar math
-                    while (j < previous.Size)
-                    {
-                        if (dropOut == null || !dropOut[i, j] || DontDropOutOnUpdate)
-                        {
-                            float delta = previous.Neurons[j] * gamma[i] * weightLearningRate;
-
-                            Weights[i, j] -=
-                                // delta 
-                                delta
-                                // momentum 
-                                + (WeightDeltas![i, j] * momentum)
-                                  // strengthen learned weights
-                                  //                            + (weightLearningRate * (gamma[i] * weightCost * Weights[i][j]));  
-                                  + (weightLearningRate * (gamma[i] - weightCost * Weights[i, j]));
-
-                            WeightDeltas[i, j] = delta;
-                        }
-                        j++;
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// the easy to read version
-        /// </summary>
-        public void UpdateOnCPU(Layer previous, float[] gamma, float weightLearningRate, float biasLearningRate, float momentum, float weightCost, BitBuffer2D? dropOut = null)
-        {
-            // calculate new weights and biases for the last layer in the network 
-            for (int i = 0; i < Size; i++)
-            {
-                float delta = gamma[i] * biasLearningRate;
-                Biases[i] -= delta + (BiasDeltas![i] * momentum);
-                BiasDeltas![i] = delta;
-
-                // apply some learning... move in direction of result using gamma 
-                int j = 0;
-                unchecked
-                {
-                    // calc the rest with scalar math
-                    while (j < previous.Size)
-                    {
-                        if (dropOut == null || !dropOut[i, j] || DontDropOutOnUpdate)
-                        {
-                            delta = previous.Neurons[j] * gamma[i] * weightLearningRate;
-
-                            Weights[i, j] -=
-                                // delta 
-                                delta
-                                // momentum 
-                                + (WeightDeltas![i, j] * momentum)
-                                // strengthen learned weights
-                                + (weightLearningRate * (gamma[i] - weightCost * Weights[i, j]));
-
-                            WeightDeltas[i, j] = delta;
-                        }
-                        j++;
-                    }
-                }
-            }
-        }
     }
 }

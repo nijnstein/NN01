@@ -12,20 +12,14 @@ using NSS;
 
 namespace NN01
 {
-    public class SwishLayer : Layer
+    public class SwishLayer : ParameterLayer
     {
-        public override LayerActivationFunction ActivationType => LayerActivationFunction.Swish;
-        public SwishLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
-            : base
-            (
-                  size,
-                  previousSize,
-                  weightInit == LayerInitializationType.Default ? LayerInitializationType.HeNormal : weightInit,
-                  biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
-                  softmax,
-                  skipInit, 
-                  random
-            )
+        public override LayerType ActivationType => LayerType.Swish;
+        public override LayerConnectedness Connectedness => LayerConnectedness.Full;
+        public override LayerInitializationType WeightInitializer => LayerInitializationType.HeNormal;
+        public override LayerInitializationType BiasInitializer => LayerInitializationType.dot01;
+        public SwishLayer(int size, int previousSize, bool skipInit = false, IRandom random = null)
+            : base(size, previousSize, skipInit, random)
         {
         }
 
@@ -86,12 +80,6 @@ namespace NN01
                 i++;
             }
         }
-
-        public override void ReversedActivation(Layer next)
-        {
-            throw new NotImplementedException();
-        }
-
 
         public override void Derivate(Span<float> input, Span<float> output)
         {

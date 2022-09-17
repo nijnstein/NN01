@@ -12,10 +12,9 @@ using System.Threading.Tasks;
 namespace NSS
 {
 
-
-    public class CPURandom : IRandom
+    public class CPURandom : IRandom, IDisposable
     {
-        private SimpleRNG rng;
+        protected SimpleRNG rng;
         public RandomDistributionInfo Info { get; set; }
 
         public RandomDistributionType DistributionType => RandomDistributionType.Uniform;
@@ -28,11 +27,15 @@ namespace NSS
             Info = info;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Fill(Span<float> data) => Fill(data, 0, data.Length);
+        public virtual void Seed(uint a, uint b) => rng.SetSeed(a, b); 
+
+        public virtual void Seed(DateTime dt) => rng.SetSeedFromSystemTime(DateTime.Now); 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Fill(Span<float> data, int startIndex, int count)
+        public virtual void Fill(Span<float> data) => Fill(data, 0, data.Length);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public virtual void Fill(Span<float> data, int startIndex, int count)
         {
             unchecked
             {
@@ -41,24 +44,22 @@ namespace NSS
                     data[i] = NextSingle();
                 }
             }
-        }
-
-    
+        }                    
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Next(int i)
+        public virtual int Next(int i)
         {
             return rng.GetInt(i); 
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float NextSingle()
+        public virtual float NextSingle()
         {
             return Info.Kernel(rng, Info.P1, Info.P2, Info.P3);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Span<float> Span(int length)
+        public virtual Span<float> Span(int length)
         {
             Span<float> data = stackalloc float[length];
             unchecked
@@ -69,6 +70,10 @@ namespace NSS
                 }
             }
             return data.ToArray().AsSpan();
+        }
+
+        public void Dispose()
+        {
         }
     }
 }

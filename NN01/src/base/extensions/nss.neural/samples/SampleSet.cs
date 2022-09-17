@@ -1,5 +1,6 @@
 ﻿using ILGPU;
 using ILGPU.Runtime;
+using System.Data;
 using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
 
@@ -277,12 +278,16 @@ namespace NSS.Neural
         }
 
 
-        public void AllocateGPU(Accelerator acc, int populationCount)
+        public void AllocateAndCopyToGPU(Accelerator acc, int populationCount)
         {
-            gpu_data = acc.Allocate2DDenseX<float>(Data);
-            gpu_expectation = acc.Allocate2DDenseX<float>(Expectation);
-            gpu_sampleErrors = acc.Allocate2DDenseX<float>(sampleError);
-            gpu_actual = acc.Allocate3DDenseXY<float>(actual); 
+            gpu_data = acc.Allocate2DDenseX<float>(new Index2D(Data.GetLength(0), Data.GetLength(1)));
+            gpu_expectation = acc.Allocate2DDenseX<float>(new Index2D(Expectation.GetLength(0), Expectation.GetLength(1)));
+            gpu_sampleErrors = acc.Allocate2DDenseX<float>(new Index2D(sampleError.GetLength(0), sampleError.GetLength(1)));
+            gpu_actual = acc.Allocate3DDenseXY<float>(new Index3D(actual.GetLength(0), actual.GetLength(1), actual.GetLength(2))); 
+
+            gpu_data.CopyFromCPU(data); 
+            gpu_expectation.CopyFromCPU(expectation);
+
             acc.Synchronize(); 
         }
 

@@ -38,10 +38,10 @@ namespace UnitTests
                   8,
                   2
               },
-              new LayerActivationFunction[] {
-                    LayerActivationFunction.ReLU,
-                    LayerActivationFunction.Swish,
-                    LayerActivationFunction.LeakyReLU,
+              new LayerType[] {
+                    LayerType.ReLU,
+                    LayerType.Swish,
+                    LayerType.LeakyReLU,
               }
             );
 

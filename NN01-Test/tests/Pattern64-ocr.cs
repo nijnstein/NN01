@@ -233,10 +233,10 @@ namespace UnitTests
                   32,
                   10
               },
-              new LayerActivationFunction[] {
-                    LayerActivationFunction.ReLU,
-                    LayerActivationFunction.Tanh,
-                    LayerActivationFunction.LeakyReLU,
+              new LayerType[] {
+                    LayerType.ReLU,
+                    LayerType.Tanh,
+                    LayerType.LeakyReLU,
               }
             );
 

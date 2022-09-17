@@ -36,10 +36,10 @@ namespace UnitTests
                   patternSize,
                   48, 24, 1
               },
-              new LayerActivationFunction[] {
-                    LayerActivationFunction.ReLU,
-                    LayerActivationFunction.Swish,
-                    LayerActivationFunction.LeakyReLU,
+              new LayerType[] {
+                    LayerType.ReLU,
+                    LayerType.Swish,
+                    LayerType.LeakyReLU,
               }
             );
 

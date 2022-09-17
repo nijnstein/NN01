@@ -12,9 +12,12 @@ using NSS;
 
 namespace NN01
 {
-    public class TanhLayer : Layer
+    public class TanhLayer : ParameterLayer
     {
-        public override LayerActivationFunction ActivationType => LayerActivationFunction.Tanh;
+        public override LayerType ActivationType => LayerType.Tanh;
+        public override LayerConnectedness Connectedness => LayerConnectedness.Full;
+        public override LayerInitializationType WeightInitializer => LayerInitializationType.Xavier;
+        public override LayerInitializationType BiasInitializer => LayerInitializationType.dot01;
 
         //
         //  for weights, use glorot, xavier etc.  but not a normal 
@@ -22,19 +25,11 @@ namespace NN01
         //  tanh wants close to sum(all) == 1 
         //
 
-        public TanhLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
-            : base
-            (
-                  size,
-                  previousSize,
-                  weightInit == LayerInitializationType.Default ? LayerInitializationType.Xavier : weightInit,
-                  biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
-                  softmax,
-                  skipInit, 
-                  random
-            )
+        public TanhLayer(int size, int previousSize, bool skipInit = false, IRandom random = null)
+            : base(size, previousSize, skipInit, random)
         {
         }
+
         public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
         {
             Span2D<float> w = Weights.AsSpan2D<float>();
@@ -82,11 +77,6 @@ namespace NN01
                 }
 
             }
-        }
-
-        public override void ReversedActivation(Layer next)
-        {
-            throw new NotImplementedException();
         }
 
         public override void Derivate(Span<float> input, Span<float> output)

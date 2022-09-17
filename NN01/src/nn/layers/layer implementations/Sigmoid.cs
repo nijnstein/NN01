@@ -10,20 +10,14 @@ using System.Threading.Tasks;
 
 namespace NN01
 {
-    public class SigmoidLayer : Layer
+    public class SigmoidLayer : ParameterLayer
     {
-        public override LayerActivationFunction ActivationType => LayerActivationFunction.Sigmoid;
-        public SigmoidLayer(int size, int previousSize, LayerInitializationType weightInit = LayerInitializationType.Default, LayerInitializationType biasInit = LayerInitializationType.Default, bool softmax = false, bool skipInit = false, IRandom random = null)
-            : base
-            (
-                  size,
-                  previousSize,
-                  weightInit == LayerInitializationType.Default ? LayerInitializationType.Glorot : weightInit,
-                  biasInit == LayerInitializationType.Default ? LayerInitializationType.dot01 : biasInit,
-                  softmax,
-                  skipInit, 
-                  random
-            )
+        public override LayerType ActivationType => LayerType.Sigmoid;
+        public override LayerConnectedness Connectedness => LayerConnectedness.Full;
+        public override LayerInitializationType WeightInitializer => LayerInitializationType.Glorot;
+        public override LayerInitializationType BiasInitializer => LayerInitializationType.dot01;
+        public SigmoidLayer(int size, int previousSize, bool skipInit = false, IRandom random = null)
+            : base(size, previousSize, skipInit, random)
         {
         }
         public override void Activate(Layer previous, Span<float> inputData, Span<float> outputData)
@@ -52,12 +46,6 @@ namespace NN01
             // }            
         }
 
-        public override void ReversedActivation(Layer next)
-        {
-            throw new NotImplementedException();
-        }
-
-
         public override void Derivate(Span<float> input, Span<float> output)
         {
             Debug.Assert(input != null);
@@ -68,7 +56,6 @@ namespace NN01
             Intrinsics.SubstractScalar(1f, input, output); // 1 - target
             Intrinsics.Multiply(input, output, output); // output = target * (1-target)
         }
-
 
         public override void CalculateGamma(Span<float> delta, Span<float> gamma, Span<float> target)
         {

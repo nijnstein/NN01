@@ -1,15 +1,8 @@
 ﻿using NSS;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace NN01 
+namespace NSS
 {
     public static class ActivationFunctions
     {
@@ -23,7 +16,7 @@ namespace NN01
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float Sigmoid(this float f)
+        public static float Sigmoid(float f)
         {
             // faster alternative:
             // see https://stackoverflow.com/questions/412019/math-optimization-in-c-sharp 
@@ -40,21 +33,21 @@ namespace NN01
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float SigmoidDerivative(this float f)
+        public static float SigmoidDerivative(float f)
         {
             return f * (1f - f);
         }
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float Swish(this float f)
+        public static float Swish(float f)
         {
-            return f * f.Sigmoid();
+            return f * ActivationFunctions.Sigmoid(f);
         }
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float SwishDerivative(this float f)
+        public static float SwishDerivative(float f)
         {
             // see
             // https://sefiks.com/2018/08/21/swish-as-neural-networks-activation-function/
@@ -64,7 +57,7 @@ namespace NN01
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float TanhFast(this float x)
+        public static float TanhFast(float x)
         {
             return x / (1f + MathF.Abs(x));
             // return (float)MathF.Tanh(x);
@@ -113,7 +106,7 @@ namespace NN01
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float ReLU(this float x)
+        public static float ReLU(float x)
         {
             return x < 0 ? 0 : x;
         }
@@ -126,7 +119,7 @@ namespace NN01
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float LeakyReLU(this float x)
+        public static float LeakyReLU(float x)
         {
             return x < 0 ? 0.01f * x : x;
         }
@@ -166,7 +159,7 @@ namespace NN01
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float SoftplusDerivative(float x) => x.Sigmoid();
+        public static float SoftplusDerivative(float x) => Sigmoid(x);
 
 
         [Pure]

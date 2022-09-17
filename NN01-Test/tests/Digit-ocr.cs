@@ -48,19 +48,25 @@ namespace UnitTests
         public void Run(int steps = 100, bool allowGPU = true)
         {
             Trainer.Settings settings = new Trainer.Settings();
-            settings.Population = 12;//64;
+            settings.Population = 8;//64;
             settings.Steps = steps;
             settings.GPU = allowGPU && GPUContext.HaveGPUAcceleration;
             settings.MiniBatchSize = 0;
             settings.LearningRate = 0.01f;
-            settings.BatchedLearningRate = 0.03f;
+            settings.BatchedLearningRate = 0.01f;
             settings.OnlineTraining = true;
             settings.BatchedStartSteps = 0;
             settings.MutationChance = 0.3f;
             settings.WeightMutationStrength = 0.05f;
             settings.BiasMutationStrength = 0.01f;
-            settings.SoftMax = false;
-            settings.Random = new CPURandom(RandomDistributionInfo.Uniform(0f, 1f));
+            settings.SoftMax = true;
+            settings.RandomGPU = settings.GPU;
+            settings.Random =
+                settings.RandomGPU
+                ?
+                new GPURandom(RandomDistributionInfo.Uniform(0f, 1f), 1024 * 256, 16, null)
+                :
+                new CPURandom(RandomDistributionInfo.Uniform(0f, 1f));
 
 
             int sampleCountPerClass = 128;
@@ -103,6 +109,9 @@ namespace UnitTests
             settings.BatchedStartSteps = int.Parse(Console.ReadLine());
             Console.Write("> number of steps to train in total: ");
             settings.Steps = int.Parse(Console.ReadLine());
+            Console.Write("> enable softmax layer [Y/N]: ");
+            settings.SoftMax = Console.ReadKey().Key == ConsoleKey.Y;
+            Console.WriteLine(); 
 
             settings.ReadyEstimator = (nn) =>
             {
@@ -113,23 +122,16 @@ namespace UnitTests
             //  {
             //       return 1 - Math.Min(0.999999f, network.Cost);
             //   };
+            
+            NeuralNetwork nn = NeuralNetworkBuilder
+                .FromInput(patternSize)
+                .ReLU(28 * 28 * 2)
+                //.Dropout(0.02f)
+                .TanH(28 * 2)
+                .Sigmoid(classCount)
+                .Softmax(settings.SoftMax)
+                .Build(settings.Random); 
 
-            NeuralNetwork nn = new NeuralNetwork(
-              new int[]
-              {
-                              patternSize,
-                              28 * 28,
-                              28 * 2,
-                              classCount,
-              },
-              new LayerActivationFunction[] {
-                                LayerActivationFunction.ReLU,
-                                LayerActivationFunction.Tanh,
-                               LayerActivationFunction.Sigmoid
-              },
-              settings.SoftMax,
-              settings.Random
-            );
 
             int totalParameterCount = nn.CalculateTotalParameterCount();
 
@@ -227,7 +229,7 @@ namespace UnitTests
                 testIndex = Random.Shared.Next(testSet.SampleCount);
                 
                 Sample sample = testSet.Samples[testIndex];
-                Span<float> outputs = nn.FeedForward(testSet.SampleData(testIndex));
+                Span<float> outputs = nn.FeedForward(testSet.SampleData(testIndex), true);
                 int index = outputs.ArgMax();
 
                 bool result = index + 1 == sample.Class; 

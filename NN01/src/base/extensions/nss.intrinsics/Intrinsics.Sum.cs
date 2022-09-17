@@ -450,5 +450,28 @@ namespace NSS
             }
             return sum;
         }
+
+        /// <summary>
+        /// a = (a - b) * (a - b)
+        /// </summary>
+        [Pure]
+        [MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+        public static Span<float> SquaredDifferences(Span<float> a, Span<float> b)
+        {
+            return SquaredDifferences(a, b, a);
+        }
+        /// <summary>
+        /// output = (a-b) * (a-b);
+        /// </summary>
+        [Pure]
+        [MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+        public static Span<float> SquaredDifferences(Span<float> a, Span<float> b, Span<float> output)
+        {
+            Intrinsics.Substract(a, b, output);
+            Intrinsics.Square(output, output);
+            return output; 
+        }
+
+
     }
 }

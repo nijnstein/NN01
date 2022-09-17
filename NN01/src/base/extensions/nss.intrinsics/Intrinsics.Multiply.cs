@@ -73,5 +73,71 @@ namespace NSS
 
             return output; 
         }
+
+        /// <summary>
+        /// a = a * a
+        /// </summary>
+        /// <param name="a"></param>
+        /// <returns></returns>
+        [MethodImplAttribute(MethodImplOptions.AggressiveInlining)]
+        public static Span<float> Square(Span<float> a)
+        {
+            return Square(a, a); 
+        }
+
+        /// <summary>
+        /// output = a * a  
+        /// </summary>
+        public static Span<float> Square(Span<float> a, Span<float> output)
+        {
+            int i = 0;
+
+            if (Avx.IsSupported)
+            {
+                if (a.Length > 7)
+                {
+                    Span<Vector256<float>> aa = MemoryMarshal.Cast<float, Vector256<float>>(a);
+                    Span<Vector256<float>> d = MemoryMarshal.Cast<float, Vector256<float>>(output);
+                    unchecked
+                    {
+                        int j = 0;
+                        while (i < (a.Length & ~31))
+                        {
+                            d[j + 0] = Avx.Multiply(aa[j + 0], aa[j + 0]);
+                            d[j + 1] = Avx.Multiply(aa[j + 1], aa[j + 0]);
+                            d[j + 2] = Avx.Multiply(aa[j + 2], aa[j + 0]);
+                            d[j + 3] = Avx.Multiply(aa[j + 3], aa[j + 0]);
+                            i += 32;
+                            j += 4;
+                        }
+                        while (i < (a.Length & ~7))
+                        {
+                            d[j] = Avx.Multiply(aa[j], aa[j]);
+                            i += 8;
+                            j++;
+                        }
+                    }
+                }
+            }
+
+            unchecked
+            {
+                while (i < (a.Length & ~3))
+                {
+                    output[i + 0] = a[i + 0] * a[i + 0];
+                    output[i + 1] = a[i + 1] * a[i + 1];
+                    output[i + 2] = a[i + 2] * a[i + 2];
+                    output[i + 3] = a[i + 3] * a[i + 3];
+                    i += 4;
+                }
+                while (i < a.Length)
+                {
+                    output[i] = a[i] * a[i];
+                    i++;
+                }
+            }
+
+            return output;
+        }
     }
 }

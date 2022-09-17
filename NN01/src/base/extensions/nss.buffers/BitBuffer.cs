@@ -17,14 +17,14 @@ namespace NSS
     {
         public readonly int BitCount;
 
-        protected bool bufferIsLeased; 
+        protected bool bufferIsLeased;
         protected int[] buffer;
 
         public BitBuffer(int bitCount)
         {
             Debug.Assert(bitCount > 0);
             BitCount = bitCount;
-            bufferIsLeased = true; 
+            bufferIsLeased = true;
             buffer = ArrayPool<int>.Shared.Rent((BitCount & ~31) + 1);
         }
         public BitBuffer(int bitCount, int[] bufferBase)
@@ -41,9 +41,21 @@ namespace NSS
         {
             get
             {
-                return IsSet(bitIndex); 
+                return IsSet(bitIndex);
             }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ZeroAll() => DisableAll();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void DisableAll()
+        {
+            buffer.Zero(); 
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnableAll() => buffer.Fill(-1);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsSet(int bit)
